@@ -42,6 +42,22 @@ type FactsResponse =
       error: string;
     };
 
+type UpdateStatusResponse =
+  | {
+      ok: true;
+      fact: {
+        id: string;
+        fact_key: string;
+        canonical_text: string;
+        previous_status: string;
+        next_status: string;
+      };
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 function fmt(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -49,7 +65,48 @@ function fmt(iso: string | null | undefined): string {
   return d.toLocaleString();
 }
 
-function FactCard({ fact }: { fact: FactRow }) {
+function FactCard(props: {
+  fact: FactRow;
+  onRefresh: () => Promise<void>;
+}) {
+  const { fact, onRefresh } = props;
+  const [busy, setBusy] = useState(false);
+
+  async function updateStatus(nextStatus: "active" | "historical" | "disputed") {
+    const note =
+      window.prompt(`Optional note for ${nextStatus}:`, "")?.trim() ?? "";
+
+    setBusy(true);
+    try {
+      const res = await fetch("/api/facts/update-status", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          factId: fact.id,
+          nextStatus,
+          note,
+        }),
+      });
+
+      const json = (await res.json().catch(() => ({}))) as UpdateStatusResponse;
+
+      if (!res.ok || json.ok === false) {
+        alert(json.ok === false ? json.error : `Status update failed (HTTP ${res.status})`);
+        return;
+      }
+
+      await onRefresh();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Status update failed";
+      alert(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -84,6 +141,26 @@ function FactCard({ fact }: { fact: FactRow }) {
 
       <div style={{ marginTop: 6, fontSize: 12, opacity: 0.75 }}>
         supersedes_fact_id: {fact.supersedes_fact_id ?? "none"}
+      </div>
+
+      <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {fact.status !== "active" && (
+          <button onClick={() => void updateStatus("active")} disabled={busy}>
+            {busy ? "Working..." : "Restore active"}
+          </button>
+        )}
+
+        {fact.status !== "historical" && (
+          <button onClick={() => void updateStatus("historical")} disabled={busy}>
+            {busy ? "Working..." : "Mark historical"}
+          </button>
+        )}
+
+        {fact.status !== "disputed" && (
+          <button onClick={() => void updateStatus("disputed")} disabled={busy}>
+            {busy ? "Working..." : "Mark disputed"}
+          </button>
+        )}
       </div>
 
       <div style={{ marginTop: 10 }}>
@@ -208,6 +285,7 @@ export default function FactsPage() {
             {loading ? "Loading..." : "Refresh"}
           </button>
 
+          <button onClick={() => (window.location.href = "/trace")}>Trace audit</button>
           <button onClick={() => (window.location.href = "/")}>Back</button>
         </div>
       </div>
@@ -262,7 +340,7 @@ export default function FactsPage() {
               ) : (
                 <div style={{ display: "grid", gap: 12 }}>
                   {grouped.self.map((fact) => (
-                    <FactCard key={fact.id} fact={fact} />
+                    <FactCard key={fact.id} fact={fact} onRefresh={load} />
                   ))}
                 </div>
               )}
@@ -275,7 +353,7 @@ export default function FactsPage() {
               ) : (
                 <div style={{ display: "grid", gap: 12 }}>
                   {grouped.people.map((fact) => (
-                    <FactCard key={fact.id} fact={fact} />
+                    <FactCard key={fact.id} fact={fact} onRefresh={load} />
                   ))}
                 </div>
               )}
@@ -288,7 +366,7 @@ export default function FactsPage() {
               ) : (
                 <div style={{ display: "grid", gap: 12 }}>
                   {grouped.other.map((fact) => (
-                    <FactCard key={fact.id} fact={fact} />
+                    <FactCard key={fact.id} fact={fact} onRefresh={load} />
                   ))}
                 </div>
               )}
