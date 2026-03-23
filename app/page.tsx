@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type ChatMessage = {
@@ -8,11 +8,39 @@ type ChatMessage = {
   text: string;
 };
 
+type ChatResponse = {
+  ok: boolean;
+  text?: string;
+  error?: string;
+};
+
+function makeRequestId(): string {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // ignore
+  }
+
+  const rand = Math.random().toString(16).slice(2);
+  const ts = Date.now().toString(16);
+  return `req_${ts}_${rand}`;
+}
+
+function isAbortError(e: unknown): boolean {
+  return !!(e && typeof e === "object" && (e as any).name === "AbortError");
+}
+
 export default function Page() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [email, setEmail] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [status, setStatus] = useState("");
+
+  const sendingRef = useRef(false);
+  const abortChatRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -31,16 +59,62 @@ export default function Page() {
     void loadUser();
   }, []);
 
-  function sendMessage() {
-    const text = input.trim();
-    if (!text) return;
+  function pushMessage(message: ChatMessage) {
+    setMessages((m) => [...m, message]);
+  }
 
-    setMessages((m) => [...m, { role: "user", text }]);
-    setMessages((m) => [
-      ...m,
-      { role: "assistant", text: "Memori is not connected yet." },
-    ]);
+  async function sendMessage(raw: string) {
+    const text = String(raw ?? "").trim();
+    if (!text) return;
+    if (sendingRef.current) return;
+
+    sendingRef.current = true;
+    setStatus("Thinking...");
     setInput("");
+    pushMessage({ role: "user", text });
+
+    try {
+      abortChatRef.current?.abort();
+    } catch {
+      // ignore
+    }
+
+    const ac = new AbortController();
+    abortChatRef.current = ac;
+    const requestId = makeRequestId();
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "x-memori-request-id": requestId,
+        },
+        body: JSON.stringify({ text, requestId }),
+        signal: ac.signal,
+      });
+
+      const data = (await res.json().catch(() => ({}))) as ChatResponse;
+
+      if (!res.ok || data.ok === false) {
+        pushMessage({ role: "assistant", text: data.error ?? "Chat error" });
+        return;
+      }
+
+      pushMessage({
+        role: "assistant",
+        text: data.text ?? "(No response)",
+      });
+    } catch (err: unknown) {
+      if (isAbortError(err)) return;
+      const msg = err instanceof Error ? err.message : "Chat request failed";
+      pushMessage({ role: "assistant", text: msg });
+    } finally {
+      setStatus("");
+      abortChatRef.current = null;
+      sendingRef.current = false;
+    }
   }
 
   async function signOut() {
@@ -58,7 +132,7 @@ export default function Page() {
           "Checking login..."
         ) : email ? (
           <>
-            Signed in as <strong>{email}</strong>{" "}
+            Signed in as <strong>{email}</strong>
             <button onClick={() => void signOut()} style={{ marginLeft: 8 }}>
               Sign out
             </button>
@@ -74,7 +148,7 @@ export default function Page() {
         style={{
           border: "1px solid #ddd",
           padding: 12,
-          minHeight: 200,
+          minHeight: 240,
           marginTop: 16,
         }}
       >
@@ -83,15 +157,28 @@ export default function Page() {
             <strong>{m.role === "user" ? "You" : "Memori"}:</strong> {m.text}
           </div>
         ))}
+        {status && (
+          <div>
+            <em>{status}</em>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
+            if (e.repeat) return;
+            e.preventDefault();
+            void sendMessage(input);
+          }}
           style={{ flex: 1 }}
         />
-        <button onClick={sendMessage}>Send</button>
+        <button onClick={() => void sendMessage(input)} disabled={sendingRef.current}>
+          Send
+        </button>
       </div>
     </main>
   );
