@@ -75,7 +75,6 @@ export default function Page() {
   const [completedToday, setCompletedToday] = useState(false);
   const [reviewNowBusy, setReviewNowBusy] = useState(false);
 
-  // ✅ NEW — proactive reminder
   const [reminder, setReminder] = useState<string | null>(null);
 
   const sendingRef = useRef(false);
@@ -146,26 +145,43 @@ export default function Page() {
 
       if (res.ok && data.ok && data.reminder) {
         setReminder(data.reminder.text);
+      } else {
+        setReminder(null);
       }
-    } catch {}
+    } catch {
+      setReminder(null);
+    }
   }
 
-  async function loadCompletedToday() {
-    const res = await fetch("/api/reviews/completed-today");
-    const data = (await res.json()) as CompletedTodayResponse;
-    setCompletedToday(res.ok && data.ok && data.completed_today);
+  async function loadCompletedToday(): Promise<boolean> {
+    try {
+      const res = await fetch("/api/reviews/completed-today");
+      const data = (await res.json()) as CompletedTodayResponse;
+      const value = Boolean(res.ok && data.ok && data.completed_today);
+      setCompletedToday(value);
+      return value;
+    } catch {
+      setCompletedToday(false);
+      return false;
+    }
   }
 
-  async function checkBanner() {
-    if (dismissedToday || completedToday || shownToday) return;
+  async function checkBanner(completedTodayValue: boolean) {
+    if (dismissedToday || completedTodayValue || shownToday) return;
 
-    const res = await fetch("/api/reviews/due-count");
-    const data = (await res.json()) as DueCountResponse;
+    try {
+      const res = await fetch("/api/reviews/due-count");
+      const data = (await res.json()) as DueCountResponse;
 
-    if (res.ok && data.ok && data.due_count > 0) {
-      setDueCount(data.due_count);
-      setBannerHidden(false);
-      markShownToday();
+      if (res.ok && data.ok && data.due_count > 0) {
+        setDueCount(data.due_count);
+        setBannerHidden(false);
+        markShownToday();
+      } else {
+        setBannerHidden(true);
+      }
+    } catch {
+      setBannerHidden(true);
     }
   }
 
@@ -173,8 +189,8 @@ export default function Page() {
     (async () => {
       await loadSummary();
       await loadReminder();
-      await loadCompletedToday();
-      await checkBanner();
+      const completed = await loadCompletedToday();
+      await checkBanner(completed);
     })();
   }, []);
 
@@ -202,11 +218,32 @@ export default function Page() {
 
     sendingRef.current = true;
     setInput("");
+    setStatus("Thinking...");
     pushMessage({ role: "user", text });
 
     const requestId = makeRequestId();
 
     try {
+      try {
+        const alreadyChecked = localStorage.getItem(FIRST_CHAT_CHECK_KEY) === todayLocal();
+        if (!alreadyChecked) {
+          const completed = await loadCompletedToday();
+          await checkBanner(completed);
+          localStorage.setItem(FIRST_CHAT_CHECK_KEY, todayLocal());
+        }
+      } catch {
+        // ignore
+      }
+
+      try {
+        abortChatRef.current?.abort();
+      } catch {
+        // ignore
+      }
+
+      const ac = new AbortController();
+      abortChatRef.current = ac;
+
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -214,6 +251,7 @@ export default function Page() {
           "x-memori-request-id": requestId,
         },
         body: JSON.stringify({ text, requestId }),
+        signal: ac.signal,
       });
 
       const data = (await res.json()) as ChatResponse;
@@ -224,12 +262,14 @@ export default function Page() {
       });
 
       await loadSummary();
-      await loadReminder(); // ✅ refresh reminder after chat
+      await loadReminder();
     } catch (err) {
       if (!isAbortError(err)) {
         pushMessage({ role: "assistant", text: "Request failed" });
       }
     } finally {
+      abortChatRef.current = null;
+      setStatus("");
       sendingRef.current = false;
     }
   }
@@ -255,11 +295,12 @@ export default function Page() {
             </button>
           </>
         ) : (
-          <>Not signed in. <a href="/login">Go to login</a></>
+          <>
+            Not signed in. <a href="/login">Go to login</a>
+          </>
         )}
       </div>
 
-      {/* ✅ PROACTIVE REMINDER */}
       {reminder && (
         <div
           style={{
@@ -275,41 +316,55 @@ export default function Page() {
         </div>
       )}
 
-      {/* REVIEW BANNER */}
       {!bannerHidden && (
-        <div style={{ marginTop: 16 }}>
+        <div
+          style={{
+            marginTop: 16,
+            padding: 12,
+            border: "1px solid #cfe2ff",
+            background: "#e7f1ff",
+            borderRadius: 8,
+          }}
+        >
           <strong>{dueCount} review(s) due</strong>
-          <div>
-            <button onClick={() => void handleReviewNow()}>
-              Review now
+          <div style={{ marginTop: 8 }}>
+            <button onClick={() => void handleReviewNow()} disabled={reviewNowBusy}>
+              {reviewNowBusy ? "Opening..." : "Review now"}
             </button>
-            <button onClick={dismissToday}>Not now</button>
+            <button onClick={dismissToday} style={{ marginLeft: 8 }}>
+              Not now
+            </button>
           </div>
         </div>
       )}
 
-      {/* SUMMARY */}
       <section style={{ marginTop: 16 }}>
         <h3>What Memori knows about you</h3>
         <div>{summaryLoading ? "Loading..." : summary}</div>
 
-        <div style={{ marginTop: 10 }}>
-          <button onClick={() => void loadSummary()}>
-            Refresh summary
-          </button>
-          <button onClick={() => (window.location.href = "/vault")}>
-            Open Vault
-          </button>
+        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button onClick={() => void loadSummary()}>Refresh summary</button>
+          <button onClick={() => (window.location.href = "/vault")}>Open Vault</button>
+          <button onClick={() => (window.location.href = "/facts")}>Facts audit</button>
+          <button onClick={() => (window.location.href = "/trace")}>Trace audit</button>
+          <button onClick={() => (window.location.href = "/onboarding")}>Onboarding</button>
+          <button onClick={() => (window.location.href = "/reviews")}>Reviews</button>
+          <button onClick={() => (window.location.href = "/digest")}>Digest</button>
         </div>
       </section>
 
-      {/* CHAT */}
       <div style={{ marginTop: 20 }}>
         {messages.map((m, i) => (
           <div key={i}>
             <strong>{m.role}:</strong> {m.text}
           </div>
         ))}
+
+        {status && (
+          <div style={{ marginTop: 8 }}>
+            <em>{status}</em>
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -317,11 +372,16 @@ export default function Page() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") sendMessage(input);
+            if (e.key !== "Enter") return;
+            if (e.repeat) return;
+            e.preventDefault();
+            void sendMessage(input);
           }}
           style={{ flex: 1 }}
         />
-        <button onClick={() => void sendMessage(input)}>Send</button>
+        <button onClick={() => void sendMessage(input)} disabled={sendingRef.current}>
+          Send
+        </button>
       </div>
     </main>
   );
