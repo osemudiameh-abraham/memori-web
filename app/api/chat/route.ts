@@ -101,8 +101,9 @@ function normalizeForFacts(input: string): string {
 function parseName(maybeName: string): string | null {
   const n = String(maybeName ?? "").trim();
   if (!n) return null;
-  if (!/^[A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,3}$/.test(n))
+  if (!/^[A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,3}$/.test(n)) {
     return null;
+  }
   return n;
 }
 
@@ -188,12 +189,8 @@ function tier1ShouldExtract(userText: string): boolean {
     /\b(my|our|mine|me|i)\b/.test(t) ||
     /\b(name)\b/.test(t) ||
     /\b(is|was|are|were)\b/.test(t) ||
-    /\b(i have|i've got|i got|i work|i live|timezone|time zone|role)\b/.test(
-      t
-    ) ||
-    /\b(friend|friends|sister|sisters|brother|brothers|partner|partners|wife|husband|mum|mom|dad|father|mother|boss|manager|coworker|coworkers|colleague|colleagues|dog|dogs|cat|cats|pet|child|son|daughter)\b/.test(
-      t
-    )
+    /\b(i have|i've got|i got|i work|i live|timezone|time zone|role)\b/.test(t) ||
+    /\b(friend|friends|sister|sisters|brother|brothers|partner|partners|wife|husband|mum|mom|dad|father|mother|boss|manager|coworker|coworkers|colleague|colleagues|dog|dogs|cat|cats|pet|child|son|daughter)\b/.test(t)
   );
 }
 
@@ -690,6 +687,126 @@ function directFactAnswer(
   return null;
 }
 
+type DecisionCandidate = {
+  decisionText: string;
+  expectedOutcome: string | null;
+};
+
+function extractDecisionCandidate(text: string): DecisionCandidate | null {
+  const raw = String(text ?? "").trim();
+  if (!raw) return null;
+
+  const t = raw.toLowerCase();
+
+  const strongPatterns = [
+    /^i decided to\b/i,
+    /^i have decided to\b/i,
+    /^i've decided to\b/i,
+    /^my decision is to\b/i,
+    /^i will\b/i,
+    /^i'm going to\b/i,
+    /^i am going to\b/i,
+    /^i plan to\b/i,
+  ];
+
+  const matched = strongPatterns.some((re) => re.test(raw));
+  if (!matched) return null;
+
+  let cleaned = raw.replace(/[.!?]+$/, "").trim();
+  if (!cleaned) return null;
+
+  let expectedOutcome: string | null = null;
+
+  const soThatMatch = cleaned.match(/\bso that\s+(.+)$/i);
+  if (soThatMatch) {
+    const outcome = parseLooseValue(soThatMatch[1], 160);
+    if (outcome) expectedOutcome = outcome;
+  }
+
+  const becauseMatch = cleaned.match(/\bbecause\s+(.+)$/i);
+  if (!expectedOutcome && becauseMatch) {
+    const outcome = parseLooseValue(becauseMatch[1], 160);
+    if (outcome) expectedOutcome = outcome;
+  }
+
+  return {
+    decisionText: cleaned,
+    expectedOutcome,
+  };
+}
+
+async function storeDecisionFromChat(args: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  userId: string;
+  decisionText: string;
+  expectedOutcome: string | null;
+}): Promise<string> {
+  const nowIso = new Date().toISOString();
+  const reviewDueIso = new Date(Date.now() + 7 * 86400000).toISOString();
+
+  const recentSinceIso = new Date(Date.now() - 10 * 60000).toISOString();
+
+  const { data: existing, error: existingError } = await args.supabase
+    .from("memories_structured")
+    .select("id")
+    .eq("user_id", args.userId)
+    .eq("memory_type", "decision")
+    .eq("text", args.decisionText)
+    .gte("created_at", recentSinceIso)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  if (existing?.id) {
+    return String(existing.id);
+  }
+
+  const { data, error } = await args.supabase
+    .from("memories_structured")
+    .insert({
+      user_id: args.userId,
+      source_message_id: null,
+      text: args.decisionText,
+      memory_type: "decision",
+      importance: 0.9,
+      certainty: 0.9,
+      expected_outcome: args.expectedOutcome,
+      review_due_at: reviewDueIso,
+      last_seen_at: nowIso,
+      times_recalled: 0,
+      archived_at: null,
+      archived: null,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const decisionId = String((data as any)?.id ?? "");
+
+  try {
+    await args.supabase.from("decision_events").insert({
+      user_id: args.userId,
+      decision_id: decisionId,
+      event_type: "created",
+      event_data: {
+        source: "chat_route",
+        expected_outcome: args.expectedOutcome,
+      },
+      created_at: nowIso,
+    });
+  } catch {
+    // non-blocking
+  }
+
+  return decisionId;
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
   const { data: authData, error: authErr } = await supabase.auth.getUser();
@@ -838,6 +955,33 @@ export async function POST(req: NextRequest) {
           strategyHistory.push({ step: "tier3_llm", extracted: llmFacts.map((f) => f.kind) });
         }
       }
+    }
+
+    const decisionCandidate = extractDecisionCandidate(text);
+    if (decisionCandidate) {
+      strategyHistory.push({
+        step: "decision_detected",
+        decision_text: decisionCandidate.decisionText,
+        expected_outcome: decisionCandidate.expectedOutcome,
+      });
+
+      const decisionId = await storeDecisionFromChat({
+        supabase,
+        userId: user.id,
+        decisionText: decisionCandidate.decisionText,
+        expectedOutcome: decisionCandidate.expectedOutcome,
+      });
+
+      strategyHistory.push({
+        step: "decision_stored",
+        decision_id: decisionId,
+      });
+
+      return respond({
+        mode: "ANALYST",
+        assistantText: "Decision recorded. I’ll bring it back for review in 7 days.",
+        pickedMemoryIds: [decisionId],
+      });
     }
 
     const allMemories = await fetchMemoriesForUser(user.id);

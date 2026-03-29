@@ -5,6 +5,26 @@ import { loadIdentityContext } from "@/lib/identity/context";
 
 export const runtime = "nodejs";
 
+function normalizeDisplayValue(value: string | null | undefined): string | null {
+  const v = String(value ?? "").trim();
+  if (!v) return null;
+  return v;
+}
+
+function titleCaseWords(value: string | null | undefined): string | null {
+  const v = normalizeDisplayValue(value);
+  if (!v) return null;
+
+  return v
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => {
+      if (!word) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
 export async function GET() {
   const supabase = await createSupabaseServerClient();
 
@@ -22,34 +42,71 @@ export async function GET() {
 
   const factMap = new Map(facts.map((f) => [f.fact_key, f]));
 
-  const name =
+  const rawName =
     factMap.get("self_name")?.value_text ??
     identity?.selfName ??
     identity?.displayName ??
     null;
 
-  const company = factMap.get("self_company")?.value_text ?? identity?.company ?? null;
-  const role = factMap.get("self_role")?.value_text ?? identity?.role ?? null;
-  const city = factMap.get("self_city")?.value_text ?? identity?.city ?? null;
-  const timezone = factMap.get("self_timezone")?.value_text ?? identity?.timezone ?? null;
+  const rawCompany =
+    factMap.get("self_company")?.value_text ??
+    identity?.company ??
+    null;
 
-  const jamesRelation = factMap.get("person_james_relation")?.value_text ?? null;
-  const jamesRole = factMap.get("person_james_role")?.value_text ?? null;
-  const dogName = factMap.get("dog_name")?.value_text ?? null;
+  const rawRole =
+    factMap.get("self_role")?.value_text ??
+    identity?.role ??
+    null;
+
+  const rawCity =
+    factMap.get("self_city")?.value_text ??
+    identity?.city ??
+    null;
+
+  const rawTimezone =
+    factMap.get("self_timezone")?.value_text ??
+    identity?.timezone ??
+    null;
+
+  const rawJamesRelation = factMap.get("person_james_relation")?.value_text ?? null;
+  const rawJamesRole = factMap.get("person_james_role")?.value_text ?? null;
+  const rawDogName = factMap.get("dog_name")?.value_text ?? null;
+
+  const name = titleCaseWords(rawName);
+  const company = normalizeDisplayValue(rawCompany);
+  const role = normalizeDisplayValue(rawRole);
+  const city = titleCaseWords(rawCity);
+  const timezone = titleCaseWords(rawTimezone);
+  const jamesRelation = normalizeDisplayValue(rawJamesRelation);
+  const jamesRole = normalizeDisplayValue(rawJamesRole);
+  const dogName = titleCaseWords(rawDogName);
 
   const lines: string[] = [];
 
-  if (name) lines.push(`You’re ${name}.`);
-  if (city && timezone) lines.push(`You live in ${city} and your timezone is ${timezone}.`);
-  else if (city) lines.push(`You live in ${city}.`);
-  else if (timezone) lines.push(`Your timezone is ${timezone}.`);
+  if (name) {
+    lines.push(`You’re ${name}.`);
+  }
 
-  if (company && role) lines.push(`You work at ${company} as ${role}.`);
-  else if (company) lines.push(`You work at ${company}.`);
-  else if (role) lines.push(`You work as ${role}.`);
+  if (city && timezone) {
+    lines.push(`You live in ${city} and your timezone is ${timezone}.`);
+  } else if (city) {
+    lines.push(`You live in ${city}.`);
+  } else if (timezone) {
+    lines.push(`Your timezone is ${timezone}.`);
+  }
+
+  if (company && role) {
+    lines.push(`You work at ${company} as ${role}.`);
+  } else if (company) {
+    lines.push(`You work at ${company}.`);
+  } else if (role) {
+    lines.push(`You work as ${role}.`);
+  }
 
   if (jamesRelation && jamesRole) {
-    lines.push(`Your colleague James runs ${jamesRole}.`);
+    lines.push(`Your ${jamesRelation} James runs ${jamesRole}.`);
+  } else if (jamesRelation) {
+    lines.push(`James is your ${jamesRelation}.`);
   }
 
   if (dogName) {
@@ -57,7 +114,8 @@ export async function GET() {
   }
 
   const summary =
-    lines.join(" ") || "Memori does not know enough about you yet. Add more facts to build your identity summary.";
+    lines.join(" ") ||
+    "Memori does not know enough about you yet. Add more facts to build your identity summary.";
 
   return NextResponse.json({
     ok: true,
