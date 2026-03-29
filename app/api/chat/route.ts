@@ -687,6 +687,118 @@ function directFactAnswer(
   return null;
 }
 
+function canonicalCandidateFromLLMFact(fact: LLMFact): CanonicalFactCandidate | null {
+  const text = String(fact.factText ?? "").trim();
+  const confidence = Math.max(0.75, Math.min(1, Number(fact.confidence ?? 0.85)));
+
+  const selfNameMatch = text.match(/^my\s+name:\s+(.+)$/i);
+  if (selfNameMatch) {
+    const name = parseName(selfNameMatch[1]);
+    if (name) {
+      return makeSelfCanonicalFact("self_name", "name", name, `My name is ${name}.`, confidence);
+    }
+  }
+
+  const relationNameMatch = text.match(/^([a-z_ ]+?)\s+name:\s+(.+)$/i);
+  if (relationNameMatch) {
+    const rawRelation = relationNameMatch[1].trim().toLowerCase().replace(/\s+/g, "_");
+    const name = parseName(relationNameMatch[2]);
+    if (name) {
+      const relation = rawRelation === "my" ? "self" : normalizeRelation(rawRelation.replace(/_/g, " "));
+      return toCanonicalFactCandidate(relation, name);
+    }
+  }
+
+  const selfCompanyMatch = text.match(/^self\s+company:\s+(.+)$/i);
+  if (selfCompanyMatch) {
+    const company = parseLooseValue(selfCompanyMatch[1], 120);
+    if (company) {
+      return makeSelfCanonicalFact(
+        "self_company",
+        "company",
+        company,
+        `I work at ${company}.`,
+        confidence
+      );
+    }
+  }
+
+  const selfRoleMatch = text.match(/^self\s+role:\s+(.+)$/i);
+  if (selfRoleMatch) {
+    const role = parseLooseValue(selfRoleMatch[1], 120);
+    if (role) {
+      return makeSelfCanonicalFact(
+        "self_role",
+        "role",
+        role,
+        `I work as ${role}.`,
+        confidence
+      );
+    }
+  }
+
+  const selfCityMatch = text.match(/^self\s+city:\s+(.+)$/i);
+  if (selfCityMatch) {
+    const city = parseLooseValue(selfCityMatch[1], 120);
+    if (city) {
+      return makeSelfCanonicalFact(
+        "self_city",
+        "city",
+        city,
+        `I live in ${city}.`,
+        confidence
+      );
+    }
+  }
+
+  const selfTimezoneMatch = text.match(/^self\s+timezone:\s+(.+)$/i);
+  if (selfTimezoneMatch) {
+    const tz = parseLooseValue(selfTimezoneMatch[1], 120);
+    if (tz) {
+      return makeSelfCanonicalFact(
+        "self_timezone",
+        "timezone",
+        tz,
+        `My timezone is ${tz}.`,
+        confidence
+      );
+    }
+  }
+
+  const personRelationMatch = text.match(/^([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\s+relation:\s+(.+)$/i);
+  if (personRelationMatch) {
+    const person = parseName(personRelationMatch[1]);
+    const relation = parseLooseValue(personRelationMatch[2], 60);
+    if (person && relation) {
+      const normalizedRelation = normalizeRelation(relation);
+      return makePersonCanonicalFact(
+        person,
+        "relation",
+        normalizedRelation,
+        `${person} is my ${normalizedRelation}.`,
+        confidence
+      );
+    }
+  }
+
+  const personRoleMatch = text.match(/^([A-Za-z][A-Za-z'\-]*(?:\s+[A-Za-z][A-Za-z'\-]*){0,2})\s+role:\s+(.+)$/i);
+  if (personRoleMatch) {
+    const person = parseName(personRoleMatch[1]);
+    const role = parseLooseValue(personRoleMatch[2], 120);
+    if (person && role) {
+      return makePersonCanonicalFact(
+        person,
+        "role",
+        role,
+        `${person} runs ${role}.`,
+        confidence
+      );
+    }
+  }
+
+  return null;
+}
+
 type DecisionCandidate = {
   decisionText: string;
   expectedOutcome: string | null;
@@ -953,6 +1065,59 @@ export async function POST(req: NextRequest) {
         } else {
           const llmFacts = await tier3ExtractFactsWithLLM(text);
           strategyHistory.push({ step: "tier3_llm", extracted: llmFacts.map((f) => f.kind) });
+
+          const canonicalSeen = new Set<string>();
+
+          for (const f of llmFacts) {
+            try {
+              const evidenceMemoryId = await storeFactMemory({
+                userId: user.id,
+                factText: f.factText,
+                sourceMessageId: requestId || null,
+                importance: 0.7,
+                certainty: f.confidence,
+              });
+
+              const candidate = canonicalCandidateFromLLMFact(f);
+
+              strategyHistory.push({
+                step: "canonical_evidence_saved",
+                kind: f.kind,
+                evidenceMemoryId,
+                fact_key: candidate?.fact_key ?? null,
+              });
+
+              if (candidate && !canonicalSeen.has(candidate.fact_key)) {
+                canonicalSeen.add(candidate.fact_key);
+
+                strategyHistory.push({
+                  step: "canonical_upsert_attempt",
+                  fact_key: candidate.fact_key,
+                  value_text: candidate.value_text,
+                });
+
+                const factId = await upsertCanonicalFact({
+                  userId: user.id,
+                  candidate,
+                  evidenceMemoryId,
+                });
+
+                strategyHistory.push({
+                  step: "canonical_upsert_success",
+                  fact_key: candidate.fact_key,
+                  fact_id: factId,
+                });
+              }
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : "fact store failed";
+              strategyHistory.push({
+                step: "fact_store_error",
+                tier: 3,
+                kind: f.kind,
+                error: msg,
+              });
+            }
+          }
         }
       }
     }
