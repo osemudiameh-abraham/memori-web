@@ -14,6 +14,33 @@ function timeAgo(dateStr: string): string {
   return `${days} days ago`
 }
 
+function scoreMemory(m: any): number {
+  let score = 0
+
+  // Recency (more recent = higher)
+  const ageMs = Date.now() - new Date(m.created_at).getTime()
+  const ageDays = ageMs / (1000 * 60 * 60 * 24)
+
+  score += Math.max(0, 5 - ageDays) // decay over ~5 days
+
+  // Importance boost (if exists)
+  if (m.importance) {
+    score += m.importance * 2
+  }
+
+  // If tied to a decision → HIGH priority
+  if (m.parent_decision_id) {
+    score += 5
+  }
+
+  // Longer notes slightly more meaningful
+  if (m.text && m.text.length > 40) {
+    score += 1
+  }
+
+  return score
+}
+
 export async function GET(_req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient()
@@ -28,27 +55,35 @@ export async function GET(_req: NextRequest) {
       )
     }
 
-    // Get recent notes (last 3 days)
-    const since = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+    // Pull recent memories (not just notes anymore)
+    const since = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
 
     const { data: memories } = await supabase
       .from("memories_structured")
-      .select("id, text, created_at")
+      .select("id, text, created_at, importance, parent_decision_id")
       .eq("user_id", user.id)
-      .eq("memory_type", "note")
+      .in("memory_type", ["note", "decision", "outcome"])
       .gte("created_at", since)
       .order("created_at", { ascending: false })
-      .limit(5)
+      .limit(10)
 
     if (!memories || memories.length === 0) {
       return NextResponse.json({ ok: true, reminder: null })
     }
 
-    const chosen = memories[0]
+    // Score and pick best
+    const ranked = memories
+      .map(m => ({
+        ...m,
+        score: scoreMemory(m),
+      }))
+      .sort((a, b) => b.score - a.score)
+
+    const chosen = ranked[0]
 
     const when = timeAgo(chosen.created_at)
 
-    const message = `You mentioned "${chosen.text}" ${when}. This might still matter. Do you want to update or expand on it?`
+    const message = `You mentioned "${chosen.text}" ${when}. This might still be important. Do you want to revisit it?`
 
     return NextResponse.json({
       ok: true,
