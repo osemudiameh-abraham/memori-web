@@ -12,6 +12,20 @@ type DecisionRow = {
   outcome_count: number | null;
 };
 
+function buildPatternSignal(outcomeCount: number | null): string | null {
+  const count = Number(outcomeCount ?? 0);
+
+  if (count >= 3) {
+    return "You’ve reviewed this multiple times. This might be a recurring pattern.";
+  }
+
+  if (count === 2) {
+    return "This is the second time you’re reviewing this. Pay attention to the outcome.";
+  }
+
+  return null;
+}
+
 export async function GET(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
 
@@ -55,6 +69,10 @@ export async function GET(req: NextRequest) {
 
   const decision = data as DecisionRow | null;
 
+  const patternSignal = decision
+    ? buildPatternSignal(decision.outcome_count)
+    : null;
+
   return NextResponse.json({
     ok: true,
     decision: decision
@@ -65,6 +83,7 @@ export async function GET(req: NextRequest) {
           expected_outcome: decision.expected_outcome,
           reviewed_at: decision.reviewed_at,
           outcome_count: decision.outcome_count ?? 0,
+          pattern_signal: patternSignal, // ✅ NEW
         }
       : null,
   });
