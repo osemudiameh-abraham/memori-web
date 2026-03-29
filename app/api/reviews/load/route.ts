@@ -3,12 +3,24 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+type DecisionRow = {
+  id: string;
+  text_snapshot: string;
+  review_due_at: string | null;
+  expected_outcome: string | null;
+  reviewed_at: string | null;
+  outcome_count: number | null;
+};
+
 export async function GET(req: NextRequest) {
   const supabase = await createSupabaseServerClient();
 
   const { data: authData, error: authErr } = await supabase.auth.getUser();
   if (authErr || !authData.user) {
-    return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated" },
+      { status: 401 }
+    );
   }
 
   const user = authData.user;
@@ -17,11 +29,10 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString();
 
   let query = supabase
-    .from("memories_structured")
-    .select("id,text,review_due_at,expected_outcome")
+    .from("decisions")
+    .select("id,text_snapshot,review_due_at,expected_outcome,reviewed_at,outcome_count")
     .eq("user_id", user.id)
-    .eq("memory_type", "decision")
-    .is("archived_at", null);
+    .eq("archived", false);
 
   if (focus) {
     query = query.eq("id", focus).limit(1);
@@ -36,17 +47,24 @@ export async function GET(req: NextRequest) {
   const { data, error } = await query.maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message },
+      { status: 500 }
+    );
   }
+
+  const decision = data as DecisionRow | null;
 
   return NextResponse.json({
     ok: true,
-    decision: data
+    decision: decision
       ? {
-          id: data.id,
-          text: data.text,
-          review_due_at: data.review_due_at,
-          expected_outcome: data.expected_outcome,
+          id: decision.id,
+          text: decision.text_snapshot,
+          review_due_at: decision.review_due_at,
+          expected_outcome: decision.expected_outcome,
+          reviewed_at: decision.reviewed_at,
+          outcome_count: decision.outcome_count ?? 0,
         }
       : null,
   });
