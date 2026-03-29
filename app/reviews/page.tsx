@@ -1,225 +1,139 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react"
 
-type ReviewDecision = {
-  id: string;
-  text: string;
-  review_due_at: string | null;
-  expected_outcome: string | null;
-};
-
-type LoadResponse =
-  | {
-      ok: true;
-      decision: ReviewDecision | null;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-type SubmitResponse =
-  | {
-      ok: true;
-      outcome_id: string | null;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function fmt(iso: string | null | undefined) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString();
+type Decision = {
+  id: string
+  text: string
+  review_due_at: string | null
+  expected_outcome: string | null
+  reviewed_at?: string | null
+  outcome_count?: number
 }
 
 export default function ReviewsPage() {
-  const searchParams = useSearchParams();
-  const focusId = (searchParams.get("focus") ?? "").trim();
-
-  const [loading, setLoading] = useState(false);
-  const [decision, setDecision] = useState<ReviewDecision | null>(null);
-  const [status, setStatus] = useState("");
-  const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [decision, setDecision] = useState<Decision | null>(null)
+  const [note, setNote] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
 
   async function load() {
-    setLoading(true);
-    setStatus("");
+    setLoading(true)
 
-    try {
-      const url = focusId
-        ? `/api/reviews/load?focus=${encodeURIComponent(focusId)}`
-        : "/api/reviews/load";
+    const res = await fetch("/api/reviews/load")
+    const data = await res.json()
 
-      const res = await fetch(url, {
-        method: "GET",
-        credentials: "include",
-      });
-
-      const json = (await res.json().catch(() => ({}))) as LoadResponse;
-
-      if (!res.ok || json.ok === false) {
-        setStatus(json.ok === false ? json.error : `Load failed (HTTP ${res.status})`);
-        setDecision(null);
-        return;
-      }
-
-      setDecision(json.decision);
-    } catch (e: unknown) {
-      setStatus(e instanceof Error ? e.message : "Load failed");
-      setDecision(null);
-    } finally {
-      setLoading(false);
+    if (data.ok) {
+      setDecision(data.decision)
     }
+
+    setLoading(false)
   }
 
   useEffect(() => {
-    void load();
-  }, [focusId]);
+    load()
+  }, [])
 
   async function submit(outcomeLabel: "worked" | "failed" | "partial") {
-    if (!decision || busy) return;
+    if (!decision) return
 
-    setBusy(true);
-    setStatus("");
+    setSubmitting(true)
 
-    try {
-      const res = await fetch("/api/reviews/submit", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          decisionId: decision.id,
-          outcomeLabel,
-          note,
-        }),
-      });
+    await fetch("/api/reviews/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        decisionId: decision.id,
+        outcomeLabel,
+        note,
+      }),
+    })
 
-      const json = (await res.json().catch(() => ({}))) as SubmitResponse;
+    setNote("")
+    await load()
+    setSubmitting(false)
+  }
 
-      if (!res.ok || json.ok === false) {
-        setStatus(json.ok === false ? json.error : `Submit failed (HTTP ${res.status})`);
-        return;
-      }
+  if (loading) {
+    return <div className="p-6">Loading...</div>
+  }
 
-      setStatus("Review saved.");
-      setNote("");
-      await load();
-    } catch (e: unknown) {
-      setStatus(e instanceof Error ? e.message : "Submit failed");
-    } finally {
-      setBusy(false);
-    }
+  if (!decision) {
+    return <div className="p-6">No decisions to review.</div>
   }
 
   return (
-    <main style={{ maxWidth: 760, margin: "40px auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Decision Reviews</h1>
-          <div style={{ marginTop: 6, opacity: 0.75 }}>
-            Review prior decisions and record what happened.
-          </div>
-        </div>
+    <div className="p-6 max-w-2xl mx-auto space-y-6">
 
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => (window.location.href = "/")}>Back</button>
-          <button onClick={() => void load()} disabled={loading}>
-            {loading ? "Loading..." : "Refresh"}
-          </button>
-        </div>
+      <h1 className="text-2xl font-semibold">
+        Decision Reviews
+      </h1>
+
+      <div className="text-sm opacity-60">
+        Due: {decision.review_due_at}
       </div>
 
-      {status && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 12,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-          }}
-        >
-          {status}
+      {/* Decision */}
+      <div className="p-4 border rounded-lg bg-white">
+        <p className="text-sm opacity-60 mb-1">Decision</p>
+        <p className="text-base">{decision.text}</p>
+      </div>
+
+      {/* Expected outcome */}
+      {decision.expected_outcome && (
+        <div className="p-4 border rounded-lg bg-neutral-50">
+          <p className="text-sm opacity-60 mb-1">Expected outcome</p>
+          <p className="text-base">{decision.expected_outcome}</p>
         </div>
       )}
 
-      {!loading && !decision && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 16,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-          }}
+      {/* History */}
+      <div className="p-4 border rounded-lg bg-neutral-50">
+        <p className="text-sm opacity-60 mb-1">Review history</p>
+        <p className="text-base">
+          Reviewed {decision.outcome_count ?? 0} time(s)
+        </p>
+      </div>
+
+      {/* Note */}
+      <div>
+        <p className="text-sm mb-1">Review note</p>
+        <textarea
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="w-full border rounded-md p-2"
+        />
+      </div>
+
+      {/* Buttons */}
+      <div className="flex gap-3">
+        <button
+          disabled={submitting}
+          onClick={() => submit("worked")}
+          className="px-4 py-2 border rounded-md"
         >
-          No due decisions right now.
-        </div>
-      )}
+          Worked
+        </button>
 
-      {decision && (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 16,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-          }}
+        <button
+          disabled={submitting}
+          onClick={() => submit("partial")}
+          className="px-4 py-2 border rounded-md"
         >
-          <div style={{ fontSize: 13, opacity: 0.75 }}>
-            Due: <strong>{fmt(decision.review_due_at)}</strong>
-          </div>
+          Partial
+        </button>
 
-          <div style={{ marginTop: 12 }}>
-            <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 6 }}>
-              <strong>Decision</strong>
-            </div>
-            <div style={{ whiteSpace: "pre-wrap" }}>{decision.text}</div>
-          </div>
+        <button
+          disabled={submitting}
+          onClick={() => submit("failed")}
+          className="px-4 py-2 border rounded-md"
+        >
+          Failed
+        </button>
+      </div>
 
-          {decision.expected_outcome && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 6 }}>
-                <strong>Expected outcome</strong>
-              </div>
-              <div style={{ whiteSpace: "pre-wrap" }}>{decision.expected_outcome}</div>
-            </div>
-          )}
-
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, opacity: 0.75, marginBottom: 6 }}>
-              <strong>Review note</strong>
-            </div>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={4}
-              style={{ width: "100%" }}
-              placeholder="What happened?"
-            />
-          </div>
-
-          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-            <button onClick={() => void submit("worked")} disabled={busy}>
-              {busy ? "Saving..." : "Worked"}
-            </button>
-
-            <button onClick={() => void submit("partial")} disabled={busy}>
-              {busy ? "Saving..." : "Partial"}
-            </button>
-
-            <button onClick={() => void submit("failed")} disabled={busy}>
-              {busy ? "Saving..." : "Failed"}
-            </button>
-          </div>
-        </div>
-      )}
-    </main>
-  );
+    </div>
+  )
 }
