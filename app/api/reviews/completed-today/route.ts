@@ -14,7 +14,10 @@ export async function GET() {
 
   const { data: authData, error: authErr } = await supabase.auth.getUser();
   if (authErr || !authData.user) {
-    return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated" },
+      { status: 401 }
+    );
   }
 
   const user = authData.user;
@@ -24,11 +27,14 @@ export async function GET() {
     .from("decision_events")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .in("event_type", ["reviewed", "outcome_logged"])
+    .eq("event_type", "reviewed")
     .gte("created_at", startIso);
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({

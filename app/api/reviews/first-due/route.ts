@@ -3,23 +3,29 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+type DecisionRow = {
+  id: string;
+};
+
 export async function GET() {
   const supabase = await createSupabaseServerClient();
 
   const { data: authData, error: authErr } = await supabase.auth.getUser();
   if (authErr || !authData.user) {
-    return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+    return NextResponse.json(
+      { ok: false, error: "Not authenticated" },
+      { status: 401 }
+    );
   }
 
   const user = authData.user;
   const nowIso = new Date().toISOString();
 
   const { data, error } = await supabase
-    .from("memories_structured")
+    .from("decisions")
     .select("id")
     .eq("user_id", user.id)
-    .eq("memory_type", "decision")
-    .is("archived_at", null)
+    .eq("archived", false)
     .not("review_due_at", "is", null)
     .lte("review_due_at", nowIso)
     .order("review_due_at", { ascending: true })
@@ -27,11 +33,16 @@ export async function GET() {
     .maybeSingle();
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: error.message },
+      { status: 500 }
+    );
   }
+
+  const decision = data as DecisionRow | null;
 
   return NextResponse.json({
     ok: true,
-    decision_id: data?.id ?? null,
+    decision_id: decision?.id ?? null,
   });
 }
