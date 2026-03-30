@@ -10,6 +10,7 @@ type DecisionRow = {
   expected_outcome: string | null;
   reviewed_at: string | null;
   outcome_count: number | null;
+  archived: boolean | null;
 };
 
 function buildPatternSignal(outcomeCount: number | null): string | null {
@@ -44,9 +45,9 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from("decisions")
-    .select("id,text_snapshot,review_due_at,expected_outcome,reviewed_at,outcome_count")
+    .select("id,text_snapshot,review_due_at,expected_outcome,reviewed_at,outcome_count,archived")
     .eq("user_id", user.id)
-    .eq("archived", false);
+    .or("archived.is.null,archived.eq.false");
 
   if (focus) {
     query = query.eq("id", focus).limit(1);
@@ -68,7 +69,6 @@ export async function GET(req: NextRequest) {
   }
 
   const decision = data as DecisionRow | null;
-
   const patternSignal = decision
     ? buildPatternSignal(decision.outcome_count)
     : null;
@@ -83,7 +83,7 @@ export async function GET(req: NextRequest) {
           expected_outcome: decision.expected_outcome,
           reviewed_at: decision.reviewed_at,
           outcome_count: decision.outcome_count ?? 0,
-          pattern_signal: patternSignal, // ✅ NEW
+          pattern_signal: patternSignal,
         }
       : null,
   });

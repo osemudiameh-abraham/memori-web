@@ -25,7 +25,7 @@ export async function GET() {
     .from("decisions")
     .select("id")
     .eq("user_id", user.id)
-    .eq("archived", false)
+    .or("archived.is.null,archived.eq.false")
     .not("review_due_at", "is", null)
     .lte("review_due_at", nowIso)
     .order("review_due_at", { ascending: true })

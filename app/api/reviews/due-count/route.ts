@@ -21,7 +21,7 @@ export async function GET() {
     .from("decisions")
     .select("id", { count: "exact", head: true })
     .eq("user_id", user.id)
-    .eq("archived", false)
+    .or("archived.is.null,archived.eq.false")
     .not("review_due_at", "is", null)
     .lte("review_due_at", nowIso);
 
