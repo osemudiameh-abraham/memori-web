@@ -808,8 +808,6 @@ function extractDecisionCandidate(text: string): DecisionCandidate | null {
   const raw = String(text ?? "").trim();
   if (!raw) return null;
 
-  const t = raw.toLowerCase();
-
   const strongPatterns = [
     /^i decided to\b/i,
     /^i have decided to\b/i,
@@ -855,15 +853,14 @@ async function storeDecisionFromChat(args: {
 }): Promise<string> {
   const nowIso = new Date().toISOString();
   const reviewDueIso = new Date(Date.now() + 7 * 86400000).toISOString();
-
   const recentSinceIso = new Date(Date.now() - 10 * 60000).toISOString();
 
+  // Idempotency check — prevent duplicate decisions captured within 10 minutes
   const { data: existing, error: existingError } = await args.supabase
-    .from("memories_structured")
+    .from("decisions")
     .select("id")
     .eq("user_id", args.userId)
-    .eq("memory_type", "decision")
-    .eq("text", args.decisionText)
+    .eq("text_snapshot", args.decisionText)
     .gte("created_at", recentSinceIso)
     .limit(1)
     .maybeSingle();
@@ -876,21 +873,18 @@ async function storeDecisionFromChat(args: {
     return String(existing.id);
   }
 
+  // Write to decisions table only — sole authority for decision lifecycle
   const { data, error } = await args.supabase
-    .from("memories_structured")
+    .from("decisions")
     .insert({
       user_id: args.userId,
-      source_message_id: null,
-      text: args.decisionText,
-      memory_type: "decision",
-      importance: 0.9,
-      certainty: 0.9,
+      memory_id: null,
+      text_snapshot: args.decisionText,
+      related_goal: null,
       expected_outcome: args.expectedOutcome,
       review_due_at: reviewDueIso,
-      last_seen_at: nowIso,
-      times_recalled: 0,
-      archived_at: null,
-      archived: null,
+      outcome_count: 0,
+      created_at: nowIso,
     })
     .select("id")
     .single();
@@ -1144,7 +1138,7 @@ export async function POST(req: NextRequest) {
 
       return respond({
         mode: "ANALYST",
-        assistantText: "Decision recorded. I’ll bring it back for review in 7 days.",
+        assistantText: "Decision recorded. I'll bring it back for review in 7 days.",
         pickedMemoryIds: [decisionId],
       });
     }
