@@ -51,7 +51,9 @@ export async function loadIdentityContext(userId: string): Promise<IdentityConte
   }
 
   const displayName = cleanValue(profile?.display_name);
-  const selfName = cleanValue(factMap.self_name) ?? displayName ?? null;
+  // Canonical fact is the only source of truth for selfName.
+  // display_name is never used to answer identity questions — it may be stale.
+  const selfName = cleanValue(factMap.self_name) ?? null;
 
   return {
     userId,

@@ -615,24 +615,7 @@ function directFactAnswer(
   if (/^what(?:'s| is)? my name\??$/i.test(t)) {
     const fact = factMap.get("self_name");
     if (fact) return pack(`Your name is ${fact.value_text}.`, ["self_name"]);
-
-    const fallbackSelfName = String(identityContext?.selfName ?? "").trim();
-    if (fallbackSelfName) {
-      return {
-        answer: `Your name is ${fallbackSelfName}.`,
-        pickedMemoryIds: [],
-        factKeys: ["identity_context.self_name"],
-      };
-    }
-
-    const fallbackDisplayName = String(identityContext?.displayName ?? "").trim();
-    if (fallbackDisplayName) {
-      return {
-        answer: `Your name is ${fallbackDisplayName}.`,
-        pickedMemoryIds: [],
-        factKeys: ["identity_context.display_name"],
-      };
-    }
+    // No canonical fact — do not fall back to display_name or identity context
   }
 
   if (/^(where do i work|what company do i work at|who do i work for|where am i employed)\??$/i.test(t)) {
