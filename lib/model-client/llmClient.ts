@@ -48,8 +48,25 @@ function buildSystemPrompt(
   mode: RhetoricalMode,
   facts: MemorySnippet[]
 ): string {
-  const name = payload.identityContext?.displayName?.trim() ?? null;
-  const identityLine = name ? `The user's name is ${name}.` : "";
+  const identity = payload.identityContext;
+
+  // Use canonical selfName — never displayName which may be stale
+  const selfName = identity?.selfName?.trim() ?? null;
+  const company = identity?.company?.trim() ?? null;
+  const role = identity?.role?.trim() ?? null;
+  const city = identity?.city?.trim() ?? null;
+  const timezone = identity?.timezone?.trim() ?? null;
+
+  const identityLines: string[] = [];
+  if (selfName) identityLines.push(`The user's name is ${selfName}.`);
+  if (company) identityLines.push(`They work at ${company}.`);
+  if (role) identityLines.push(`Their role is ${role}.`);
+  if (city) identityLines.push(`They are based in ${city}.`);
+  if (timezone) identityLines.push(`Their timezone is ${timezone}.`);
+
+  const identitySection = identityLines.length > 0
+    ? ["=== WHO THIS USER IS ===", ...identityLines, "=== END ==="].join("\n")
+    : "";
 
   const factsSection =
     facts.length > 0
@@ -68,34 +85,56 @@ function buildSystemPrompt(
     ? `Decision review due (${payload.dueDecisionReview.reason ?? "no reason"}). Ask ONE review question.`
     : "No decision review required.";
 
+  const examples = `=== EXAMPLES OF GOOD RESPONSES ===
+User: what do you know about me?
+Assistant: Your name is Abraham. You work at Memori as CEO, based in London. Your dog is Bruno. Your colleague James runs finance.
+
+User: I decided to hire a head of engineering
+Assistant: Noted. Key tradeoff: speed vs fit — a wrong hire at this level costs 6-12 months. Next step: define the role scorecard before sourcing. I'll check in with you on this in 7 days.
+
+User: what patterns do you see in my decisions?
+Assistant: Three of your last five decisions involved people — hiring, delegation, or relationship management. You tend to act quickly when there's social pressure involved. Worth asking whether speed is serving you there.
+
+User: I'm feeling overwhelmed
+Assistant: What's the heaviest thing on your plate right now?
+
+User: my name is Sarah
+Assistant: Got it. I'll remember that.
+=== END OF EXAMPLES ===`;
+
   return [
+    identitySection,
+    "",
     factsSection,
+    "",
+    examples,
     "",
     "You are Memori — a cognitive continuity system for serious professionals.",
     "",
     "Hard constraints:",
-    "- No filler. No 'Got it', 'Sure', 'Nice to meet you'.",
-    "- Be direct. Short sentences.",
+    "- No filler. No 'Got it', 'Sure', 'Of course', 'Nice to meet you'.",
+    "- Be direct. Short sentences. No waffle.",
     "- Never say you are an AI or mention internal systems.",
     "- Do not manipulate. No dependency language.",
-    "- If you do not know something NOT listed above, say so clearly.",
+    "- Never invent facts. If you do not know, say so clearly.",
+    "- Never repeat the user's message back to them.",
     "",
     "Response contract:",
-    "- Decision → (a) best recommendation (b) key tradeoff (c) next step.",
-    "- Memory/recall question → answer directly from the facts above.",
-    "- Unclear input → ask max 2 clarifying questions.",
+    "- Decision → (a) best recommendation (b) key tradeoff (c) one next step.",
+    "- Recall question → answer directly from facts above. No hedging.",
+    "- Emotional input → ask one focused question. Do not lecture.",
+    "- Unclear input → ask max 1 clarifying question.",
+    "- New fact shared → acknowledge in one short sentence. Move on.",
     "",
-    identityLine,
     `Mode: ${mode} → ${modeDirective(mode)}`,
     `Decision continuity: ${due}`,
     "",
-    "Output: plain text only. No JSON. No markdown headers.",
+    "Output: plain text only. No JSON. No markdown headers. No bullet points unless listing 3+ items.",
   ]
     .filter(Boolean)
     .join("\n")
     .trim();
 }
-
 export type RunLLMResult = {
   text: string;
   mode: RhetoricalMode;
