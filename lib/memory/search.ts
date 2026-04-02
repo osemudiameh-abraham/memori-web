@@ -8,7 +8,7 @@ import type {
 export function pickRelevantMemories(
   all: MemorySnippet[],
   userText: string,
-  limit = 6
+  limit = 12
 ): MemorySnippet[] {
   const t = (userText || "").toLowerCase();
 

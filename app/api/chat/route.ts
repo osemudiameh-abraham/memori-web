@@ -1150,7 +1150,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const picked = pickRelevantMemories(withInfluence, text, 6);
+    const picked = pickRelevantMemories(withInfluence, text, 12);
     const contextSignals = (body as any).contextSignals ?? getContextSignals(text);
 
     const proposed_mode: RhetoricalMode = proposeMode({
