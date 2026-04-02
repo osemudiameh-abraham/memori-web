@@ -106,8 +106,9 @@ export async function runLLM(args: {
   payload: LLMPayload;
   proposed_mode: RhetoricalMode;
   recent_modes?: RhetoricalMode[];
+  history?: { role: "user" | "assistant"; text: string }[];
 }): Promise<RunLLMResult> {
-  const { payload, proposed_mode, recent_modes } = args;
+  const { payload, proposed_mode, recent_modes, history } = args;
 
   const chosen = applyStrategicInertia({
     proposed: proposed_mode,
@@ -162,6 +163,10 @@ export async function runLLM(args: {
     temperature: 0.4,
     messages: [
       { role: "system", content: buildSystemPrompt(payload, chosen, facts) },
+      ...(history ?? []).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.text,
+      })),
       { role: "user", content: userPrompt },
     ],
   });

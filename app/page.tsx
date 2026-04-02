@@ -296,7 +296,7 @@ export default function Page() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-memori-request-id": requestId },
-        body: JSON.stringify({ text, requestId }),
+        body: JSON.stringify({ text, requestId, history: messages.slice(-10).map(m => ({ role: m.role, text: m.text })) }),
         signal: ac.signal,
       });
       const data = (await res.json()) as ChatResponse;

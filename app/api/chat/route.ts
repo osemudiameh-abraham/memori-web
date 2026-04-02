@@ -908,6 +908,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}));
   const text = String((body as any).text ?? (body as any).message ?? "").trim();
+  const history: { role: "user" | "assistant"; text: string }[] = Array.isArray((body as any).history)
+    ? (body as any).history.slice(-10).filter((m: any) => m?.role && m?.text)
+    : [];
 
   if (!text) {
     return NextResponse.json({ ok: false, error: "Missing text" }, { status: 400 });
@@ -1188,7 +1191,7 @@ export async function POST(req: NextRequest) {
       dueDecisionReview: null,
     });
 
-    const out = await runLLM({ payload, proposed_mode });
+    const out = await runLLM({ payload, proposed_mode, history });
 
     void bumpMemoriesRecalled(picked.map((m) => String(m.id)));
 
