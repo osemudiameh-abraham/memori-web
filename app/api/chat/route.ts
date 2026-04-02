@@ -1143,9 +1143,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const allMemories = await fetchMemoriesForUser(user.id);
+    const [allMemories, canonicalFacts] = await Promise.all([
+      fetchMemoriesForUser(user.id),
+      fetchCanonicalFactsForUser(user.id),
+    ]);
     const recallSafeMemories = filterGovernanceNotes(allMemories);
-    const canonicalFacts = await fetchCanonicalFactsForUser(user.id);
 
     const direct = directFactAnswer(text, canonicalFacts, identityContext);
     if (direct) {
@@ -1205,11 +1207,7 @@ export async function POST(req: NextRequest) {
 
     const out = await runLLM({ payload, proposed_mode });
 
-    try {
-      await bumpMemoriesRecalled(picked.map((m) => String(m.id)));
-    } catch {
-      // ignore
-    }
+    void bumpMemoriesRecalled(picked.map((m) => String(m.id)));
 
     return respond({
       mode: out.mode,
