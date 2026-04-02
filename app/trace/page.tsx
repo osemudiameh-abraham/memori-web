@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 type Trace = {
@@ -23,7 +23,7 @@ function fmt(iso: string | null | undefined) {
   return d.toLocaleString();
 }
 
-export default function TracePage() {
+function TracePageInner() {
   const searchParams = useSearchParams();
   const traceId = (searchParams.get("id") ?? "").trim();
 
@@ -175,5 +175,13 @@ export default function TracePage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function TracePage() {
+  return (
+    <Suspense fallback={<main style={{ maxWidth: 980, margin: "40px auto", padding: 16 }}>Loading trace…</main>}>
+      <TracePageInner />
+    </Suspense>
   );
 }
