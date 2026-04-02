@@ -163,33 +163,18 @@ function tier1ShouldExtract(userText: string): boolean {
   if (!t || t.length < 6) return false;
 
   const lowSignal = new Set([
-    "ok",
-    "okay",
-    "thanks",
-    "thank you",
-    "cool",
-    "great",
-    "nice",
-    "lol",
-    "yes",
-    "no",
-    "k",
-    "sure",
-    "got it",
-    "yep",
-    "nope",
-    "haha",
-    "wow",
-    "hmm",
-    "interesting",
+    "ok", "okay", "thanks", "thank you", "cool", "great", "nice",
+    "lol", "yes", "no", "k", "sure", "got it", "yep", "nope",
+    "haha", "wow", "hmm", "interesting",
   ]);
   if (lowSignal.has(t)) return false;
 
   return (
     /\b(my|our|mine|me|i)\b/.test(t) ||
     /\b(name)\b/.test(t) ||
-    /\b(is|was|are|were)\b/.test(t) ||
-    /\b(i have|i've got|i got|i work|i live|timezone|time zone|role)\b/.test(t) ||
+    /\b(is|was|are|were|am)\b/.test(t) ||
+    /\b(i have|i've got|i got|i work|i live|i run|i lead|i own|i founded|i manage|i built|i started)\b/.test(t) ||
+    /\b(timezone|time zone|role|based in|located in|call me)\b/.test(t) ||
     /\b(friend|friends|sister|sisters|brother|brothers|partner|partners|wife|husband|mum|mom|dad|father|mother|boss|manager|coworker|coworkers|colleague|colleagues|dog|dogs|cat|cats|pet|child|son|daughter)\b/.test(t)
   );
 }
@@ -266,23 +251,54 @@ function tier2ExtractFacts(
     canonical?: CanonicalFactCandidate;
   }[] = [];
 
+  // ── Self name: "my name is X" ──
+  const myNameMatch = t.match(/^my\s+name\s+is\s+(.+?)[.!?]?$/i);
+  if (myNameMatch) {
+    const name = parseName(myNameMatch[1]);
+    if (name) {
+      const canonical = toCanonicalFactCandidate("self", name);
+      out.push({ kind: "my_name", factText: `my name: ${name}`, canonical });
+      out.push({ kind: "my_name_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Self name: "I'm X" / "I am X" ──
+  const imNameMatch = t.match(/^i'?m\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)[.!?]?$/);
+  if (imNameMatch && !myNameMatch) {
+    const name = parseName(imNameMatch[1]);
+    if (name) {
+      const canonical = toCanonicalFactCandidate("self", name);
+      out.push({ kind: "my_name", factText: `my name: ${name}`, canonical });
+      out.push({ kind: "my_name_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Self name: "call me X" ──
+  const callMeMatch = t.match(/^call\s+me\s+(.+?)[.!?]?$/i);
+  if (callMeMatch) {
+    const name = parseName(callMeMatch[1]);
+    if (name) {
+      const canonical = toCanonicalFactCandidate("self", name);
+      out.push({ kind: "my_name", factText: `my name: ${name}`, canonical });
+      out.push({ kind: "my_name_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Relation name: "my X's name is Y" ──
   const relMatch = t.match(/^my\s+(\w+)(?:'s)?\s+name\s+is\s+(.+?)[.!?]?$/i);
   if (relMatch) {
     const rel = normalizeRelation(relMatch[1]);
     const name = parseName(relMatch[2]);
-    if (name) {
+    if (name && rel !== "name") {
       const canonical = toCanonicalFactCandidate(rel, name);
       out.push({ kind: `${rel}_name`, factText: `${rel} name: ${name}`, canonical });
-      out.push({
-        kind: `${rel}_name_sentence`,
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: `${rel}_name_sentence`, factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Relation name: "my X is called/named Y" ──
   const calledMatch = t.match(
-    /^my\s+(\w+)\s+(?:is called|is named|is\s+called|is\s+named|'s called|'s named)\s+(.+?)[.!?]?$/i
+    /^my\s+(\w+)\s+(?:is called|is named|'s called|'s named)\s+(.+?)[.!?]?$/i
   );
   if (calledMatch && !relMatch) {
     const rel = normalizeRelation(calledMatch[1]);
@@ -290,14 +306,11 @@ function tier2ExtractFacts(
     if (name) {
       const canonical = toCanonicalFactCandidate(rel, name);
       out.push({ kind: `${rel}_name`, factText: `${rel} name: ${name}`, canonical });
-      out.push({
-        kind: `${rel}_name_sentence`,
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: `${rel}_name_sentence`, factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Relation name: "I have a X named Y" ──
   const haveMatch = t.match(/^i\s+have\s+a\s+(\w+)(?:\s+\w+)*\s+named\s+(.+?)[.!?]?$/i);
   if (haveMatch) {
     const rel = normalizeRelation(haveMatch[1]);
@@ -305,14 +318,11 @@ function tier2ExtractFacts(
     if (name) {
       const canonical = toCanonicalFactCandidate(rel, name);
       out.push({ kind: `${rel}_name`, factText: `${rel} name: ${name}`, canonical });
-      out.push({
-        kind: `${rel}_name_sentence`,
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: `${rel}_name_sentence`, factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Reverse: "X is my Y" ──
   const reverseMatch = t.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is\s+my\s+(\w+)[.!?]?$/);
   if (reverseMatch) {
     const name = parseName(reverseMatch[1]);
@@ -320,166 +330,133 @@ function tier2ExtractFacts(
     if (name) {
       const canonical = toCanonicalFactCandidate(rel, name);
       out.push({ kind: `${rel}_name`, factText: `${rel} name: ${name}`, canonical });
-      out.push({
-        kind: `${rel}_name_sentence`,
-        factText: `${name} is my ${rel}.`,
-        canonical,
-      });
+      out.push({ kind: `${rel}_name_sentence`, factText: `${name} is my ${rel}.`, canonical });
     }
   }
 
-  const myNameMatch = t.match(/^my\s+name\s+is\s+(.+?)[.!?]?$/i);
-  if (myNameMatch) {
-    const name = parseName(myNameMatch[1]);
-    if (name) {
-      const canonical = toCanonicalFactCandidate("self", name);
-      out.push({ kind: "my_name", factText: `my name: ${name}`, canonical });
-      out.push({
-        kind: "my_name_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
-    }
-  }
-
-  const workAtMatch = t.match(/^i\s+work\s+(?:at|for)\s+(.+?)[.!?]?$/i);
+  // ── Company: "I work at/for X" — strip trailing role qualifier like "as CEO" ──
+  const workAtMatch = t.match(/^i\s+work\s+(?:at|for)\s+(.+?)(?:\s+as\s+\w+.*)?[.!?]?$/i);
   if (workAtMatch) {
     const company = parseLooseValue(workAtMatch[1]);
     if (company) {
-      const canonical = makeSelfCanonicalFact(
-        "self_company",
-        "company",
-        company,
-        `I work at ${company}.`
-      );
+      const canonical = makeSelfCanonicalFact("self_company", "company", company, `I work at ${company}.`);
       out.push({ kind: "self_company", factText: `self company: ${company}`, canonical });
-      out.push({
-        kind: "self_company_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "self_company_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Company: "I run/lead/own/founded/built/started X" ──
+  const runMatch = t.match(/^i\s+(?:run|lead|own|founded|built|started|manage|head)\s+(.+?)[.!?]?$/i);
+  if (runMatch) {
+    const company = parseLooseValue(runMatch[1]);
+    if (company) {
+      const canonical = makeSelfCanonicalFact("self_company", "company", company, `I run ${company}.`);
+      out.push({ kind: "self_company", factText: `self company: ${company}`, canonical });
+      out.push({ kind: "self_company_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Role: "I work as X" ──
   const workAsMatch = t.match(/^i\s+work\s+as\s+(.+?)[.!?]?$/i);
   if (workAsMatch) {
     const role = parseLooseValue(workAsMatch[1]);
     if (role) {
-      const canonical = makeSelfCanonicalFact(
-        "self_role",
-        "role",
-        role,
-        `I work as ${role}.`
-      );
+      const canonical = makeSelfCanonicalFact("self_role", "role", role, `I work as ${role}.`);
       out.push({ kind: "self_role", factText: `self role: ${role}`, canonical });
-      out.push({
-        kind: "self_role_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "self_role_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
-  const myRoleMatch = t.match(/^my\s+role\s+is\s+(.+?)[.!?]?$/i);
+  // ── Role: "my role is X" / "my job is X" / "my title is X" ──
+  const myRoleMatch = t.match(/^my\s+(?:role|job|title|position)\s+is\s+(.+?)[.!?]?$/i);
   if (myRoleMatch) {
     const role = parseLooseValue(myRoleMatch[1]);
     if (role) {
-      const canonical = makeSelfCanonicalFact(
-        "self_role",
-        "role",
-        role,
-        `My role is ${role}.`
-      );
+      const canonical = makeSelfCanonicalFact("self_role", "role", role, `My role is ${role}.`);
       out.push({ kind: "self_role", factText: `self role: ${role}`, canonical });
-      out.push({
-        kind: "self_role_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "self_role_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Role: "I'm a/the X" / "I am a/the X" ──
+  const imRoleMatch = t.match(/^i'?m\s+(?:a|an|the)\s+(.+?)[.!?]?$/i);
+  if (imRoleMatch) {
+    const role = parseLooseValue(imRoleMatch[1]);
+    if (role && !parseName(role)) {
+      const canonical = makeSelfCanonicalFact("self_role", "role", role, `I am a ${role}.`);
+      out.push({ kind: "self_role", factText: `self role: ${role}`, canonical });
+      out.push({ kind: "self_role_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Role + Company: "I'm X at Y" ──
+  const imRoleAtMatch = t.match(/^i'?m\s+(?:a|an|the)?\s*(.+?)\s+at\s+(.+?)[.!?]?$/i);
+  if (imRoleAtMatch) {
+    const role = parseLooseValue(imRoleAtMatch[1]);
+    const company = parseLooseValue(imRoleAtMatch[2]);
+    if (role && company && !parseName(role)) {
+      const roleCanonical = makeSelfCanonicalFact("self_role", "role", role, `I work as ${role}.`);
+      out.push({ kind: "self_role", factText: `self role: ${role}`, canonical: roleCanonical });
+      const companyCanonical = makeSelfCanonicalFact("self_company", "company", company, `I work at ${company}.`);
+      out.push({ kind: "self_company", factText: `self company: ${company}`, canonical: companyCanonical });
+    }
+  }
+
+  // ── City: "I live in X" ──
   const liveInMatch = t.match(/^i\s+live\s+in\s+(.+?)[.!?]?$/i);
   if (liveInMatch) {
     const city = parseLooseValue(liveInMatch[1]);
     if (city) {
-      const canonical = makeSelfCanonicalFact(
-        "self_city",
-        "city",
-        city,
-        `I live in ${city}.`
-      );
+      const canonical = makeSelfCanonicalFact("self_city", "city", city, `I live in ${city}.`);
       out.push({ kind: "self_city", factText: `self city: ${city}`, canonical });
-      out.push({
-        kind: "self_city_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "self_city_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
-  const timezoneMatch =
-    t.match(/^my\s+time\s*zone\s+is\s+(.+?)[.!?]?$/i) ||
-    t.match(/^my\s+timezone\s+is\s+(.+?)[.!?]?$/i);
+  // ── City: "I'm based in X" / "I'm located in X" ──
+  const basedInMatch = t.match(/^i'?m\s+(?:based|located)\s+in\s+(.+?)[.!?]?$/i);
+  if (basedInMatch) {
+    const city = parseLooseValue(basedInMatch[1]);
+    if (city) {
+      const canonical = makeSelfCanonicalFact("self_city", "city", city, `I live in ${city}.`);
+      out.push({ kind: "self_city", factText: `self city: ${city}`, canonical });
+      out.push({ kind: "self_city_sentence", factText: canonical.canonical_text, canonical });
+    }
+  }
+
+  // ── Timezone ──
+  const timezoneMatch = t.match(/^my\s+time\s*zone\s+is\s+(.+?)[.!?]?$/i)
+    ?? t.match(/^my\s+timezone\s+is\s+(.+?)[.!?]?$/i);
   if (timezoneMatch) {
     const tz = parseLooseValue(timezoneMatch[1]);
     if (tz) {
-      const canonical = makeSelfCanonicalFact(
-        "self_timezone",
-        "timezone",
-        tz,
-        `My timezone is ${tz}.`
-      );
+      const canonical = makeSelfCanonicalFact("self_timezone", "timezone", tz, `My timezone is ${tz}.`);
       out.push({ kind: "self_timezone", factText: `self timezone: ${tz}`, canonical });
-      out.push({
-        kind: "self_timezone_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "self_timezone_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Person relation: "X is my Y" ──
   const personRelationMatch = t.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+is\s+my\s+(\w+)[.!?]?$/);
   if (personRelationMatch) {
     const person = parseName(personRelationMatch[1]);
     const relation = normalizeRelation(personRelationMatch[2]);
     if (person && relation) {
-      const canonical = makePersonCanonicalFact(
-        person,
-        "relation",
-        relation,
-        `${person} is my ${relation}.`
-      );
-      out.push({
-        kind: `${relation}_person_relation`,
-        factText: `${person} relation: ${relation}`,
-        canonical,
-      });
-      out.push({
-        kind: `${relation}_person_relation_sentence`,
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      const canonical = makePersonCanonicalFact(person, "relation", relation, `${person} is my ${relation}.`);
+      out.push({ kind: `${relation}_person_relation`, factText: `${person} relation: ${relation}`, canonical });
+      out.push({ kind: `${relation}_person_relation_sentence`, factText: canonical.canonical_text, canonical });
     }
   }
 
+  // ── Person role: "X runs Y" ──
   const personRunsRoleMatch = t.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+runs\s+(.+?)[.!?]?$/);
   if (personRunsRoleMatch) {
     const person = parseName(personRunsRoleMatch[1]);
     const role = parseLooseValue(personRunsRoleMatch[2]);
     if (person && role) {
-      const canonical = makePersonCanonicalFact(
-        person,
-        "role",
-        role,
-        `${person} runs ${role}.`
-      );
+      const canonical = makePersonCanonicalFact(person, "role", role, `${person} runs ${role}.`);
       out.push({ kind: "person_role", factText: `${person} role: ${role}`, canonical });
-      out.push({
-        kind: "person_role_sentence",
-        factText: canonical.canonical_text,
-        canonical,
-      });
+      out.push({ kind: "person_role_sentence", factText: canonical.canonical_text, canonical });
     }
   }
 
