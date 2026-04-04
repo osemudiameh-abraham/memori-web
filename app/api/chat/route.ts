@@ -30,6 +30,7 @@ import type {
 } from "@/lib/preprocessing/types";
 import { attachInfluence, computeArchiveSignal } from "@/lib/memory/decay";
 import { analyseSituation } from "@/lib/cognition/situations";
+import { upsertEntities } from "@/lib/cognition/entityStore";
 
 export const runtime = "nodejs";
 
@@ -1120,6 +1121,13 @@ export async function POST(req: NextRequest) {
     }
     // Attach situation intel to payload so LLM can use it
     (body as any).situationIntel = situationIntel.hasSituation ? situationIntel : undefined;
+
+    // Phase 2D: Persist extracted entities to database (fire and forget)
+    if (situationIntel.hasSituation && situationIntel.entities.length > 0) {
+      void upsertEntities(user.id, situationIntel.entities).catch(() => {
+        // Entity persistence is non-critical — never block the chat response
+      });
+    }
 
     const [allMemories, canonicalFacts] = await Promise.all([
       fetchMemoriesForUser(user.id),
