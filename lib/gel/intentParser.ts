@@ -47,15 +47,15 @@ const MEETING_PATTERNS = [
 ];
 
 const WHATSAPP_PATTERNS = [
-  /(?:whatsapp|wa|message).{0,20}to.{0,20}([A-Z][a-z]+)/i,
-  /(?:send|drop).{0,15}(?:whatsapp|wa)/i,
-  /whatsapp.{0,30}([A-Z][a-z]+)/i,
+  /\b(?:whatsapp|wa|message)\b.{0,20}\bto\b.{0,20}([A-Z][a-z]+)/i,
+  /\b(?:send|drop).{0,15}\b(?:whatsapp|wa)\b/i,
+  /\bwhatsapp\b.{0,30}([A-Z][a-z]+)/i,
 ];
 
 const IMESSAGE_PATTERNS = [
-  /(?:imessage|iMessage|text|sms|message).{0,20}([A-Z][a-z]+)/i,
-  /(?:send|drop).{0,15}(?:text|sms|imessage)/i,
-  /text.{0,20}([A-Z][a-z]+)/i,
+  /\b(?:imessage|iMessage|text|sms|message)\b.{0,20}([A-Z][a-z]+)/i,
+  /\b(?:send|drop).{0,15}\b(?:text|sms|imessage)\b/i,
+  /\btext\b.{0,20}([A-Z][a-z]+)\b/i,
 ];
 
 const SEARCH_PATTERNS = [
