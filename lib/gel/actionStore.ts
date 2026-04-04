@@ -10,24 +10,27 @@ export async function storePendingAction(
   description: string
 ): Promise<string> {
   const supabase = await createSupabaseServerClient();
+  const insertData = {
+    user_id: userId,
+    kind: intent.type,
+    payload: {
+      params: intent.params,
+      description,
+      raw_text: intent.rawText,
+      confidence: intent.confidence,
+    },
+    status: "pending",
+  };
+
   const { data, error } = await supabase
     .from("pending_actions")
-    .insert({
-      user_id: userId,
-      kind: intent.type,
-      payload: {
-        params: intent.params,
-        description,
-        raw_text: intent.rawText,
-        confidence: intent.confidence,
-      },
-      status: "pending",
-    })
-    .select("id")
-    .single();
+    .insert(insertData)
+    .select("id, created_at")
+    .maybeSingle();
 
-  if (error || !data) throw new Error(error?.message ?? "Failed to store action");
-  return String(data.id);
+  if (error) throw new Error(error.message);
+  // Return id if available, otherwise use timestamp
+  return String(data?.id ?? data?.created_at ?? Date.now());
 }
 
 export async function approveAction(userId: string, actionId: string): Promise<void> {

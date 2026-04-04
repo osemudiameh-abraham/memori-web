@@ -1096,8 +1096,9 @@ export async function POST(req: NextRequest) {
           pickedMemoryIds: [],
           extraStrategyHistory: strategyHistory,
         });
-      } catch {
-        // Non-critical — continue with normal chat if action storage fails
+      } catch (gelErr: unknown) {
+        // Log the error but continue with normal chat
+        strategyHistory.push({ step: "gel_error", error: gelErr instanceof Error ? gelErr.message : "unknown" });
       }
     }
 
