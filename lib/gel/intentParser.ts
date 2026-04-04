@@ -67,8 +67,8 @@ function extractRecipient(text: string): string | null {
   // "to James" — most reliable
   const toMatch = text.match(/\bto\b\s+([A-Z][a-z]+)/);
   if (toMatch) return toMatch[1];
-  // "email James" or "send James" — capture word AFTER the verb
-  const verbMatch = text.match(/\b(?:email|message|send|tell|contact)\b\s+([A-Z][a-z]+)/i);
+  // "email/whatsapp/text James" — capture name AFTER the verb
+  const verbMatch = text.match(/\b(?:email|message|send|tell|contact|whatsapp|wa|text|imessage)\b\s+([A-Z][a-z]+)/i);
   if (verbMatch) return verbMatch[1];
   // "with James"
   const withMatch = text.match(/\bwith\b\s+([A-Z][a-z]+)/);
