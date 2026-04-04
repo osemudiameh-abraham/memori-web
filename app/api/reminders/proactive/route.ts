@@ -78,6 +78,8 @@ export async function GET(_req: NextRequest) {
       "mark disputed", "mark historical", "status update",
       "i live in manchester", "i live in london", "i live in",
       "my timezone", "my name is", "i work", "i am a", "i am the", "self city", "self name", "self role", "self company", "self timezone",
+      "the person's name is", "my name is", "my dog", "my timezone", "my company",
+      "my role is", "my city is", "i decided to test",
     ];
 
     const userMemories = memories.filter(m => {
