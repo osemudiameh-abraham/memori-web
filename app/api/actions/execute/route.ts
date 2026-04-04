@@ -124,16 +124,20 @@ export async function POST(req: NextRequest) {
           }, { onConflict: "user_id,entity_text,entity_type", ignoreDuplicates: false });
         }
 
-        // Look up email in entity graph
+        // Look up email in entity graph — prefer person type, fallback to any
         let recipientEmail: string | null = null;
         if (recipient) {
-          const { data: entity } = await supabase
+          const { data: entities } = await supabase
             .from("situation_entities")
-            .select("email")
+            .select("email, entity_type")
             .eq("user_id", authData.user.id)
-            .ilike("entity_text", recipient)
-            .maybeSingle();
-          recipientEmail = entity?.email ?? null;
+            .ilike("entity_text", recipient);
+          if (entities && entities.length > 0) {
+            // Prefer person type with email
+            const personWithEmail = entities.find(e => e.entity_type === "person" && e.email);
+            const anyWithEmail = entities.find(e => e.email);
+            recipientEmail = personWithEmail?.email ?? anyWithEmail?.email ?? null;
+          }
         }
 
         // If no email stored — ask for it
