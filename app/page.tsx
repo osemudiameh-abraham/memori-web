@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useDeepgramSTT } from "@/lib/voice/useDeepgramSTT";
 
-type ChatMessage = { role: "user" | "assistant"; text: string };
+type ChatMessage = { role: "user" | "assistant"; text: string; approved?: "yes" | "no" };
 type ChatResponse = { ok: boolean; text?: string; error?: string };
 type IdentitySummaryResponse = { ok: true; summary: string } | { ok: false; error: string };
 type DueCountResponse = { ok: true; due_count: number } | { ok: false; error: string };
@@ -63,6 +63,7 @@ export default function Page() {
   const [bannerHidden, setBannerHidden] = useState(true);
   const [reviewNowBusy, setReviewNowBusy] = useState(false);
   const [reminder, setReminder] = useState<string | null>(null);
+  const [approving, setApproving] = useState<string | null>(null); // tracks which message is being approved
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -192,6 +193,19 @@ export default function Page() {
     onTranscript: (text) => { setVoiceError(null); void sendMessage(text); },
     onError: (msg) => { setVoiceError(msg); },
   });
+
+
+  async function handleApprove(messageIndex: number, approved: boolean) {
+    if (approving) return;
+    setApproving(String(messageIndex));
+    setMessages(prev => {
+      const updated = [...prev];
+      updated[messageIndex] = { ...updated[messageIndex], approved: approved ? "yes" : "no" };
+      return updated;
+    });
+    await sendMessage(approved ? "yes" : "no");
+    setApproving(null);
+  }
 
   function handleMicClick() {
     setVoiceError(null);
@@ -934,7 +948,36 @@ export default function Page() {
                       <MemoriIcon size={26} spinning={false}/>
                     </div>
                   )}
-                  <div className={`bubble ${m.role}`}>{m.text}</div>
+                  {m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved ? (
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
+                      <div style={{ fontSize:14.5, lineHeight:1.65, marginBottom:14, color:"#1C1A18", whiteSpace:"pre-wrap" }}>{m.text}</div>
+                      <div style={{ display:"flex", gap:8 }}>
+                        <button
+                          onClick={() => void handleApprove(i, true)}
+                          disabled={!!approving}
+                          style={{ padding:"8px 18px", borderRadius:9, border:"none", background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}
+                        >
+                          {approving === String(i) ? "…" : "✓ Approve"}
+                        </button>
+                        <button
+                          onClick={() => void handleApprove(i, false)}
+                          disabled={!!approving}
+                          style={{ padding:"8px 18px", borderRadius:9, border:"1px solid rgba(0,0,0,0.14)", background:"transparent", color:"#6B6865", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : m.approved ? (
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
+                      <div style={{ fontSize:14, color:"#8A8785", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{m.text}</div>
+                      <div style={{ marginTop:10, fontSize:13, fontWeight:500, color: m.approved === "yes" ? "#1A5C32" : "#6B6865" }}>
+                        {m.approved === "yes" ? "✓ Approved" : "✗ Cancelled"}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`bubble ${m.role}`}>{m.text}</div>
+                  )}
                 </div>
               ))}
               {isTyping && (
