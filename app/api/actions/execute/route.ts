@@ -30,11 +30,21 @@ async function executeCreateReminder(
 
   // Store as a memory note with reminder flag
   // Clean up subject — remove quotes and "Remind me to" prefix
-  const cleanSubject = subject
+  // Strip quotes, prefixes, and the time phrase from subject
+  let cleanSubject = subject
     .replace(/^["']|["']$/g, "")
     .replace(/^remind me to /i, "")
     .replace(/^reminder:\s*/i, "")
     .trim();
+  // If time is in the subject, remove it
+  if (time) {
+    cleanSubject = cleanSubject
+      .replace(new RegExp(`\\s*(for\\s+)?${time.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'), "")
+      .replace(/\s*:\s*"[^"]*"\s*$/, "")
+      .trim();
+  }
+  // If subject is still the full original message, truncate it
+  if (cleanSubject.length > 50) cleanSubject = cleanSubject.slice(0, 47).trimEnd() + "...";
 
   const reminderText = time
     ? `Reminder: ${cleanSubject} (${time})`
@@ -52,10 +62,9 @@ async function executeCreateReminder(
 
   if (error) throw new Error(error.message);
 
-  const displaySubject = cleanSubject.length > 60 ? cleanSubject.slice(0, 57) + "..." : cleanSubject;
   return time
-    ? `Reminder saved: "${displaySubject}" — for ${time}.`
-    : `Reminder saved: "${displaySubject}". I'll surface it in your next session.`;
+    ? `✓ Reminder set: "${cleanSubject}" — for ${time}.`
+    : `✓ Reminder set: "${cleanSubject}". I'll surface it next session.`;
 }
 
 async function executeDraftMessage(
