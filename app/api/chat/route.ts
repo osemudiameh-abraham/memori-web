@@ -1092,12 +1092,17 @@ export async function POST(req: NextRequest) {
       // Store async — fire and forget
       void storePendingAction(user.id, detectedIntent, description).catch(() => {});
       strategyHistory.push({ step: "gel_intent_detected", type: detectedIntent.type, actionId: localActionId, description });
-      return respond({
+      const gelResponse = await respond({
         mode: "ANALYST",
         assistantText: `I noticed an action in your message:\n\n${description}\n\nShould I proceed? Tap Approve or Cancel below.`,
         pickedMemoryIds: [],
         extraStrategyHistory: strategyHistory,
       });
+      // Inject gel_kind and gel_params into response for UI
+      const gelBody = await gelResponse.json() as Record<string, unknown>;
+      gelBody.gel_kind = detectedIntent.type;
+      gelBody.gel_params = detectedIntent.params;
+      return NextResponse.json(gelBody);
     }
 
     const decisionCandidate = extractDecisionCandidate(text);

@@ -64,6 +64,7 @@ export default function Page() {
   const [reviewNowBusy, setReviewNowBusy] = useState(false);
   const [reminder, setReminder] = useState<string | null>(null);
   const [approving, setApproving] = useState<string | null>(null); // tracks which message is being approved
+  const [gelParams, setGelParams] = useState<{ kind: string; params: Record<string, string | null> } | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -204,31 +205,36 @@ export default function Page() {
       updated[messageIndex] = { ...updated[messageIndex], approved: approved ? "yes" : "no" };
       return updated;
     });
-    // Extract intent details from the message text to execute
+    // Use stored GEL params from detection time if available
+    const storedGel = gelParams;
     const msg = messages[messageIndex];
     const text = msg?.text ?? "";
-    // Parse kind from message — look for known action types
-    let kind = "none";
-    let params: Record<string, string | null> = {};
-    if (text.includes("email") || text.includes("Email")) {
-      kind = "send_email";
-      const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
-      const subjectMatch = text.match(/"([^"]+)"/);
-      params = { recipient: recipientMatch?.[1] ?? null, subject: subjectMatch?.[1] ?? null };
-    } else if (text.includes("reminder") || text.includes("Reminder")) {
-      kind = "create_reminder";
-      const subjectMatch = text.match(/"([^"]+)"/);
-      const timeMatch = text.match(/for ([^.]+)/);
-      params = { subject: subjectMatch?.[1] ?? text, time: timeMatch?.[1] ?? null };
-    } else if (text.includes("meeting") || text.includes("Meeting")) {
-      kind = "schedule_meeting";
-      const recipientMatch = text.match(/with ([A-Z][a-z]+)/);
-      params = { recipient: recipientMatch?.[1] ?? null, time: null };
-    } else if (text.includes("draft") || text.includes("Draft")) {
-      kind = "draft_message";
-      const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
-      params = { recipient: recipientMatch?.[1] ?? null, subject: null };
+    let kind = storedGel?.kind ?? "none";
+    let params: Record<string, string | null> = storedGel?.params ?? {};
+    // Fallback: re-parse from message text if no stored params
+    if (!storedGel) {
+      if (text.includes("email") || text.includes("Email")) {
+        kind = "send_email";
+        const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
+        const subjectMatch = text.match(/"([^"]+)"/);
+        params = { recipient: recipientMatch?.[1] ?? null, subject: subjectMatch?.[1] ?? null };
+      } else if (text.includes("reminder") || text.includes("Reminder")) {
+        kind = "create_reminder";
+        const timeMatch = text.match(/for (tomorrow|today|tonight|next \w+)/i);
+        const subjectMatch = text.match(/:\s*"([^"]+)"/);
+        params = { subject: subjectMatch?.[1] ?? "reminder", time: timeMatch?.[1] ?? null };
+      } else if (text.includes("meeting") || text.includes("Meeting")) {
+        kind = "schedule_meeting";
+        const recipientMatch = text.match(/with ([A-Z][a-z]+)/);
+        params = { recipient: recipientMatch?.[1] ?? null, time: null };
+      } else if (text.includes("draft") || text.includes("Draft")) {
+        kind = "draft_message";
+        const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
+        params = { recipient: recipientMatch?.[1] ?? null, subject: null };
+      }
     }
+    // Clear stored params after use
+    setGelParams(null);
     try {
       const res = await fetch("/api/actions/execute", {
         method: "POST", credentials: "include",
