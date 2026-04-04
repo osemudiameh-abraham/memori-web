@@ -62,10 +62,12 @@ export async function GET(_req: NextRequest) {
       .from("memories_structured")
       .select("id, text, created_at, importance, parent_decision_id")
       .eq("user_id", user.id)
-      .in("memory_type", ["note", "decision", "outcome"])
+      .in("memory_type", ["note"])
+      .eq("archived", false)
       .gte("created_at", since)
+      .gte("text_length", 30)
       .order("created_at", { ascending: false })
-      .limit(10)
+      .limit(20)
 
     if (!memories || memories.length === 0) {
       return NextResponse.json({ ok: true, reminder: null })
