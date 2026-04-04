@@ -766,7 +766,8 @@ export default function Page() {
         .mobile-headline{font-family:'Lora',Georgia,serif;font-size:clamp(24px,8vw,32px);font-weight:400;color:#2A2825;line-height:1.22;letter-spacing:-0.3px;animation:gfade 0.4s ease 0.18s both;}
 
         @media(max-width:700px){
-          .sidebar,.main,.empty,.bottom-bar,.messages{display:none!important;}
+          .sidebar,.empty,.bottom-bar,.messages{display:none!important;}
+          .main{display:flex!important;flex-direction:column;flex:1;min-height:0;width:100%;}
           .app{flex-direction:column;height:100dvh;}
           .mobile-nav{display:flex!important;width:100%;flex-shrink:0;}
           .mobile-empty{flex:1;display:flex!important;flex-direction:column;align-items:center;justify-content:center;}
