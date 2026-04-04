@@ -29,6 +29,7 @@ import type {
   RhetoricalMode,
 } from "@/lib/preprocessing/types";
 import { attachInfluence, computeArchiveSignal } from "@/lib/memory/decay";
+import { analyseSituation } from "@/lib/cognition/situations";
 
 export const runtime = "nodejs";
 
@@ -1103,6 +1104,18 @@ export async function POST(req: NextRequest) {
         mode: "ANALYST",
         assistantText: "Decision recorded. I'll bring it back for review in 7 days.",
         pickedMemoryIds: [decisionId],
+      });
+    }
+
+    // Phase 2D: Run situation intelligence on every message
+    const situationIntel = analyseSituation(text);
+    if (situationIntel.hasSituation) {
+      strategyHistory.push({
+        step: "situation_intelligence",
+        entities: situationIntel.entities.length,
+        risk_flags: situationIntel.riskFlags,
+        temporal_signals: situationIntel.temporalSignals,
+        summary: situationIntel.situationSummary,
       });
     }
 
