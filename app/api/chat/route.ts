@@ -1083,6 +1083,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Phase 3: GEL — detect action intents EARLY before LLM call
+    const detectedIntent = parseIntent(text);
+    if (detectedIntent.type !== "none" && detectedIntent.requiresApproval && detectedIntent.confidence >= 0.75) {
+      const description = formatIntentForApproval(detectedIntent);
+      try {
+        const actionId = await storePendingAction(user.id, detectedIntent, description);
+        strategyHistory.push({ step: "gel_intent_detected", type: detectedIntent.type, actionId, description });
+        return respond({
+          mode: "ANALYST",
+          assistantText: `I detected an action in your message:\n\n**${description}**\n\nShould I proceed? Reply **yes** to approve or **no** to cancel.\n\n_Action ID: ${actionId}_`,
+          pickedMemoryIds: [],
+          extraStrategyHistory: strategyHistory,
+        });
+      } catch {
+        // Non-critical — continue with normal chat if action storage fails
+      }
+    }
+
     const decisionCandidate = extractDecisionCandidate(text);
     if (decisionCandidate) {
       strategyHistory.push({
@@ -1195,28 +1213,6 @@ export async function POST(req: NextRequest) {
     // Attach situation intel to payload for LLM system prompt
     if (situationIntel.hasSituation) {
       (payload as any).situationIntel = situationIntel;
-    }
-
-    // Phase 3: GEL — detect action intents
-    const detectedIntent = parseIntent(text);
-    if (detectedIntent.type !== "none" && detectedIntent.requiresApproval && detectedIntent.confidence >= 0.75) {
-      const description = formatIntentForApproval(detectedIntent);
-      try {
-        const actionId = await storePendingAction(user.id, detectedIntent, description);
-        strategyHistory.push({ step: "gel_intent_detected", type: detectedIntent.type, actionId, description });
-        return respond({
-          mode: "ANALYST",
-          assistantText: `I detected an action in your message:
-
-**${description}**
-
-Should I proceed? Reply **yes** to approve or **no** to cancel. (Action ID: ${actionId})`,
-          pickedMemoryIds: [],
-          extraStrategyHistory: strategyHistory,
-        });
-      } catch {
-        // If action storage fails, continue with normal chat
-      }
     }
 
     const out = await runLLM({ payload, proposed_mode, history });
