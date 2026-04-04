@@ -207,6 +207,70 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case "send_whatsapp":
+      case "send_imessage": {
+        const recipient = params.recipient ?? null;
+        const recipientName = recipient ?? "them";
+        const subject = params.subject ?? "checking in";
+        const isWhatsApp = kind === "send_whatsapp";
+
+        // Look up phone in entity graph
+        let recipientPhone: string | null = null;
+        if (recipient) {
+          const { data: entities } = await supabase
+            .from("situation_entities")
+            .select("phone, entity_type")
+            .eq("user_id", authData.user.id)
+            .ilike("entity_text", recipient);
+          if (entities && entities.length > 0) {
+            const personWithPhone = entities.find(e => e.entity_type === "person" && e.phone);
+            const anyWithPhone = entities.find(e => e.phone);
+            recipientPhone = personWithPhone?.phone ?? anyWithPhone?.phone ?? null;
+          }
+        }
+
+        if (!recipientPhone) {
+          message = `I don't have a phone number for ${recipientName} yet. What's their number? (e.g. +44 7700 900000)`;
+          break;
+        }
+
+        // Draft a short conversational message via LLM
+        const { data: identityDataMsg } = await supabase
+          .from("memory_facts")
+          .select("fact_key, value_text")
+          .eq("user_id", authData.user.id)
+          .eq("status", "active")
+          .limit(10);
+
+        const identityContextMsg: Record<string, string> = {};
+        for (const fact of identityDataMsg ?? []) {
+          identityContextMsg[fact.fact_key] = fact.value_text;
+        }
+
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const senderName = identityContextMsg["self_name"] ?? "me";
+        const msgDraft = await openai.chat.completions.create({
+          model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+          temperature: 0.7,
+          max_tokens: 120,
+          messages: [
+            { role: "system", content: `You are drafting a short ${isWhatsApp ? "WhatsApp" : "iMessage"} message on behalf of ${senderName}. Keep it under 3 sentences. Casual, warm, direct. No subject line. Just the message body.` },
+            { role: "user", content: `Write a ${isWhatsApp ? "WhatsApp" : "text"} message to ${recipientName} about: "${subject}". Sender: ${senderName}.` },
+          ],
+        }).then(r => r.choices?.[0]?.message?.content?.trim() ?? `Hey ${recipientName}, wanted to reach out about ${subject}.`);
+
+        // Clean phone number
+        const cleanPhone = recipientPhone.replace(/[^0-9+]/g, "");
+
+        // Build compose URL
+        const composeUrl = isWhatsApp
+          ? `https://wa.me/${cleanPhone.replace("+", "")}?text=${encodeURIComponent(msgDraft)}`
+          : `sms:${cleanPhone}?body=${encodeURIComponent(msgDraft)}`;
+
+        message = `__MSG_COMPOSE__${composeUrl}__RECIPIENT__${recipientName}__KIND__${isWhatsApp ? "WhatsApp" : "iMessage"}`;
+        break;
+      }
+
       case "schedule_meeting":
         message = `Action queued. Meeting scheduling with ${params.recipient ?? "them"} ${params.time ? `for ${params.time}` : ""} will be available once the calendar connector is ready.`;
         break;

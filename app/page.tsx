@@ -249,9 +249,14 @@ export default function Page() {
           const gmailUrl = msg.match(/__GMAIL_COMPOSE__(.*?)__RECIPIENT__/)?.[1] ?? "";
           const recipientName = msg.match(/__RECIPIENT__(.*?)__SUBJECT__/)?.[1] ?? "them";
           const subject = msg.match(/__SUBJECT__(.*?)$/)?.[1] ?? "";
-          // Open Gmail compose in new tab
           window.open(gmailUrl, "_blank");
           setMessages(prev => [...prev, { role: "assistant", text: `__GMAIL_SENT__${recipientName}__${subject}` }]);
+        } else if (msg.startsWith("__MSG_COMPOSE__")) {
+          const composeUrl = msg.match(/__MSG_COMPOSE__(.*?)__RECIPIENT__/)?.[1] ?? "";
+          const recipientName = msg.match(/__RECIPIENT__(.*?)__KIND__/)?.[1] ?? "them";
+          const kind = msg.match(/__KIND__(.*?)$/)?.[1] ?? "message";
+          window.open(composeUrl, "_blank");
+          setMessages(prev => [...prev, { role: "assistant", text: `__MSG_SENT__${recipientName}__${kind}` }]);
         } else {
           setMessages(prev => [...prev, { role: "assistant", text: msg }]);
         }
@@ -1008,6 +1013,15 @@ export default function Page() {
                       <div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>✓ Gmail compose opened</div>
                       <div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>
                         Draft ready for <strong>{m.text.match(/__GMAIL_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send in Gmail.
+                      </div>
+                    </div>
+                  ) : m.role === "assistant" && m.text.startsWith("__MSG_SENT__") ? (
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
+                      <div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>
+                        ✓ {m.text.match(/__KIND__(.*?)$/)?.[1] ?? "Message"} compose opened
+                      </div>
+                      <div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>
+                        Message drafted for <strong>{m.text.match(/__MSG_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send.
                       </div>
                     </div>
                   ) : m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") && !m.text.startsWith("✓") && !m.text.startsWith("Reminder saved") ? (

@@ -4,6 +4,8 @@
 
 export type IntentType =
   | "send_email"
+  | "send_whatsapp"
+  | "send_imessage"
   | "draft_message"
   | "create_reminder"
   | "schedule_meeting"
@@ -42,6 +44,18 @@ const MEETING_PATTERNS = [
   /\b(schedule|book|arrange|set up)\b.{0,30}\b(meeting|call|chat|sync)\b/i,
   /\b(meeting|call)\b.{0,20}\bwith\b.{0,30}\b(next|this|on|at)\b/i,
   /\bcalendar\b.{0,20}\b(invite|event|block)\b/i,
+];
+
+const WHATSAPP_PATTERNS = [
+  /(?:whatsapp|wa|message).{0,20}to.{0,20}([A-Z][a-z]+)/i,
+  /(?:send|drop).{0,15}(?:whatsapp|wa)/i,
+  /whatsapp.{0,30}([A-Z][a-z]+)/i,
+];
+
+const IMESSAGE_PATTERNS = [
+  /(?:imessage|iMessage|text|sms|message).{0,20}([A-Z][a-z]+)/i,
+  /(?:send|drop).{0,15}(?:text|sms|imessage)/i,
+  /text.{0,20}([A-Z][a-z]+)/i,
 ];
 
 const SEARCH_PATTERNS = [
@@ -152,6 +166,40 @@ export function parseIntent(text: string): DetectedIntent {
     }
   }
 
+  // Check WhatsApp
+  for (const p of WHATSAPP_PATTERNS) {
+    if (p.test(t)) {
+      return {
+        type: "send_whatsapp",
+        confidence: 0.82,
+        params: {
+          recipient: extractRecipient(t),
+          subject: extractSubject(t) ?? t.slice(0, 60),
+          time: null,
+        },
+        rawText: t,
+        requiresApproval: true,
+      };
+    }
+  }
+
+  // Check iMessage/SMS
+  for (const p of IMESSAGE_PATTERNS) {
+    if (p.test(t)) {
+      return {
+        type: "send_imessage",
+        confidence: 0.80,
+        params: {
+          recipient: extractRecipient(t),
+          subject: extractSubject(t) ?? t.slice(0, 60),
+          time: null,
+        },
+        rawText: t,
+        requiresApproval: true,
+      };
+    }
+  }
+
   // Check search
   for (const p of SEARCH_PATTERNS) {
     if (p.test(t)) {
@@ -188,6 +236,10 @@ export function formatIntentForApproval(intent: DetectedIntent): string {
       return `Set a reminder${intent.params.time ? ` for ${intent.params.time}` : ""}${intent.params.subject ? `: "${intent.params.subject}"` : ""}`;
     case "schedule_meeting":
       return `Schedule a meeting${intent.params.recipient ? ` with ${intent.params.recipient}` : ""}${intent.params.time ? ` ${intent.params.time}` : ""}`;
+    case "send_whatsapp":
+      return `Send a WhatsApp message to ${intent.params.recipient ?? "them"}${intent.params.subject ? ` about "${intent.params.subject}"` : ""}`;
+    case "send_imessage":
+      return `Send an iMessage to ${intent.params.recipient ?? "them"}${intent.params.subject ? ` about "${intent.params.subject}"` : ""}`;
     case "search_web":
       return `Search for: "${intent.params.subject}"`;
     default:
