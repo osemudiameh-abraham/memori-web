@@ -52,9 +52,10 @@ async function executeCreateReminder(
 
   if (error) throw new Error(error.message);
 
+  const displaySubject = cleanSubject.length > 60 ? cleanSubject.slice(0, 57) + "..." : cleanSubject;
   return time
-    ? `Done — reminder set: "${cleanSubject}" for ${time}. I'll surface it when it's due.`
-    : `Done — reminder set: "${cleanSubject}". I'll surface it in your next session.`;
+    ? `Reminder saved: "${displaySubject}" — for ${time}.`
+    : `Reminder saved: "${displaySubject}". I'll surface it in your next session.`;
 }
 
 async function executeDraftMessage(
@@ -62,7 +63,7 @@ async function executeDraftMessage(
 ): Promise<string> {
   const recipient = params.recipient ?? "them";
   const subject = params.subject ?? "the topic";
-  return `Here's a draft message to ${recipient} about ${subject}:\n\n---\nHi ${recipient},\n\nI wanted to follow up about ${subject}. Let me know if you have any questions or if there's anything else you need from me.\n\nBest,\nAbraham\n---\n\nFeel free to edit this before sending.`;
+  return `Draft ready for ${recipient}:\n\nHi ${recipient},\n\nI wanted to follow up about ${subject}. Let me know if you have any questions or if there's anything else you need.\n\nBest,\nAbraham\n\nFeel free to edit before sending.`;
 }
 
 export async function POST(req: NextRequest) {
