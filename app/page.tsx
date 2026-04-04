@@ -243,7 +243,18 @@ export default function Page() {
       });
       const data = await res.json() as { ok: boolean; message?: string };
       if (data.ok && data.message) {
-        setMessages(prev => [...prev, { role: "assistant", text: data.message! }]);
+        const msg = data.message;
+        // Detect Gmail compose signal
+        if (msg.startsWith("__GMAIL_COMPOSE__")) {
+          const gmailUrl = msg.match(/__GMAIL_COMPOSE__(.*?)__RECIPIENT__/)?.[1] ?? "";
+          const recipientName = msg.match(/__RECIPIENT__(.*?)__SUBJECT__/)?.[1] ?? "them";
+          const subject = msg.match(/__SUBJECT__(.*?)$/)?.[1] ?? "";
+          // Open Gmail compose in new tab
+          window.open(gmailUrl, "_blank");
+          setMessages(prev => [...prev, { role: "assistant", text: `__GMAIL_SENT__${recipientName}__${subject}` }]);
+        } else {
+          setMessages(prev => [...prev, { role: "assistant", text: msg }]);
+        }
       }
     } catch {
       setMessages(prev => [...prev, { role: "assistant", text: approved ? "Action noted. I'll follow up shortly." : "Understood — action cancelled." }]);
@@ -992,7 +1003,14 @@ export default function Page() {
                       <MemoriIcon size={26} spinning={false}/>
                     </div>
                   )}
-                  {m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") && !m.text.startsWith("✓") && !m.text.startsWith("Reminder saved") ? (
+                  {m.role === "assistant" && m.text.startsWith("__GMAIL_SENT__") ? (
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
+                      <div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>✓ Gmail compose opened</div>
+                      <div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>
+                        Draft ready for <strong>{m.text.match(/__GMAIL_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send in Gmail.
+                      </div>
+                    </div>
+                  ) : m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") && !m.text.startsWith("✓") && !m.text.startsWith("Reminder saved") ? (
                     <div className="bubble assistant" style={{ padding:"14px 16px" }}>
                       <div style={{ fontSize:14.5, lineHeight:1.65, marginBottom:14, color:"#1C1A18", whiteSpace:"pre-wrap" }}>{m.text}</div>
                       <div style={{ display:"flex", gap:8 }}>

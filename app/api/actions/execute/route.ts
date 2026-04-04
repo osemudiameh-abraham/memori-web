@@ -4,7 +4,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
@@ -112,19 +111,7 @@ export async function POST(req: NextRequest) {
         const subject = params.subject ?? "following up";
         const recipientName = recipient ?? "them";
 
-        // If params.email provided directly — store it first
-        if (params.email && recipient) {
-          await supabase.from("situation_entities").upsert({
-            user_id: authData.user.id,
-            entity_text: recipient,
-            entity_type: "person",
-            email: params.email,
-            confidence: 1.0,
-            occurrence_count: 1,
-          }, { onConflict: "user_id,entity_text,entity_type", ignoreDuplicates: false });
-        }
-
-        // Look up email in entity graph — prefer person type, fallback to any
+        // Look up email in entity graph — prefer person type
         let recipientEmail: string | null = null;
         if (recipient) {
           const { data: entities } = await supabase
@@ -133,41 +120,25 @@ export async function POST(req: NextRequest) {
             .eq("user_id", authData.user.id)
             .ilike("entity_text", recipient);
           if (entities && entities.length > 0) {
-            // Prefer person type with email
             const personWithEmail = entities.find(e => e.entity_type === "person" && e.email);
             const anyWithEmail = entities.find(e => e.email);
             recipientEmail = personWithEmail?.email ?? anyWithEmail?.email ?? null;
           }
         }
 
-        // If no email stored — ask for it
-        if (!recipientEmail) {
-          message = `I don\'t have an email address for ${recipientName} yet.\n\nReply with their email address and I\'ll send it right away. For example: james@example.com`;
+        // Build Gmail compose URL — opens pre-filled in user's own Gmail
+        const bodyText = `Hi ${recipientName},\n\n`;
+        const gmailUrl = recipientEmail
+          ? `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`
+          : null;
+
+        if (!gmailUrl && !recipientEmail) {
+          // Ask for email first
+          message = `I don\'t have an email address for ${recipientName} yet. What\'s their email address?`;
           break;
         }
 
-        // Send via Resend
-        try {
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          const fromEmail = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
-          const senderEmail = authData.user.email ?? undefined;
-          await resend.emails.send({
-            from: fromEmail,
-            to: recipientEmail,
-            replyTo: senderEmail,
-            subject: `${subject}`,
-            html: `<p>Hi ${recipientName},</p><p>${senderEmail ? `You can reply directly to ${senderEmail}.` : ""}</p><p>Regarding: ${subject}</p><p><br/><small>Sent via Memori</small></p>`,
-          });
-          // Log execution
-          await supabase.from("pending_actions").update({
-            status: "executed",
-            executed_at: new Date().toISOString(),
-            result: { recipient: recipientEmail, subject },
-          }).eq("user_id", authData.user.id).eq("kind", "send_email").eq("status", "approved");
-          message = `✓ Email sent to ${recipientName} (${recipientEmail}) about "${subject}".`;
-        } catch (emailErr: unknown) {
-          message = `Failed to send email: ${emailErr instanceof Error ? emailErr.message : "unknown error"}`;
-        }
+        message = `__GMAIL_COMPOSE__${gmailUrl}__RECIPIENT__${recipientName}__SUBJECT__${subject}`;
         break;
       }
 
