@@ -31,6 +31,8 @@ import type {
 import { attachInfluence, computeArchiveSignal } from "@/lib/memory/decay";
 import { analyseSituation } from "@/lib/cognition/situations";
 import { upsertEntities } from "@/lib/cognition/entityStore";
+import { parseIntent, formatIntentForApproval } from "@/lib/gel/intentParser";
+import { storePendingAction } from "@/lib/gel/actionStore";
 
 export const runtime = "nodejs";
 
@@ -1193,6 +1195,28 @@ export async function POST(req: NextRequest) {
     // Attach situation intel to payload for LLM system prompt
     if (situationIntel.hasSituation) {
       (payload as any).situationIntel = situationIntel;
+    }
+
+    // Phase 3: GEL — detect action intents
+    const detectedIntent = parseIntent(text);
+    if (detectedIntent.type !== "none" && detectedIntent.requiresApproval && detectedIntent.confidence >= 0.75) {
+      const description = formatIntentForApproval(detectedIntent);
+      try {
+        const actionId = await storePendingAction(user.id, detectedIntent, description);
+        strategyHistory.push({ step: "gel_intent_detected", type: detectedIntent.type, actionId, description });
+        return respond({
+          mode: "ANALYST",
+          assistantText: `I detected an action in your message:
+
+**${description}**
+
+Should I proceed? Reply **yes** to approve or **no** to cancel. (Action ID: ${actionId})`,
+          pickedMemoryIds: [],
+          extraStrategyHistory: strategyHistory,
+        });
+      } catch {
+        // If action storage fails, continue with normal chat
+      }
     }
 
     const out = await runLLM({ payload, proposed_mode, history });
