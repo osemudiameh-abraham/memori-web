@@ -46,7 +46,8 @@ function partitionSnippets(snippets: MemorySnippet[]): {
 function buildSystemPrompt(
   payload: LLMPayload,
   mode: RhetoricalMode,
-  facts: MemorySnippet[]
+  facts: MemorySnippet[],
+  situationIntel?: { riskFlags: string[]; temporalSignals: string[]; entities: { text: string; type: string }[]; situationSummary: string | null }
 ): string {
   const identity = payload.identityContext;
 
@@ -102,7 +103,25 @@ User: my name is Sarah
 Assistant: Got it. I'll remember that.
 === END OF EXAMPLES ===`;
 
+  // Situation intelligence section
+  const situationLines: string[] = [];
+  if (situationIntel?.riskFlags && situationIntel.riskFlags.length > 0) {
+    situationLines.push("=== SITUATION SIGNALS DETECTED ===");
+    situationLines.push("The user's message contains the following signals:");
+    for (const flag of situationIntel.riskFlags) {
+      situationLines.push(`WARNING: ${flag}`);
+    }
+    situationLines.push("Acknowledge these naturally in your response. Do not ignore them.");
+    situationLines.push("=== END ===");
+  }
+  if (situationIntel?.temporalSignals && situationIntel.temporalSignals.length > 0) {
+    situationLines.push("Time context: " + situationIntel.temporalSignals.join(", ") + ". Be mindful of deadlines.");
+  }
+  const situationSection = situationLines.join("\n");
+
   return [
+    situationSection,
+    "",
     identitySection,
     "",
     factsSection,
@@ -165,6 +184,7 @@ export async function runLLM(args: {
   );
 
   const { facts, context } = partitionSnippets(payload.memorySnippets ?? []);
+  const situationIntel = (payload as any).situationIntel ?? undefined;
 
   const contextBlock =
     context.length > 0
@@ -201,7 +221,7 @@ export async function runLLM(args: {
     model,
     temperature: 0.4,
     messages: [
-      { role: "system", content: buildSystemPrompt(payload, chosen, facts) },
+      { role: "system", content: buildSystemPrompt(payload, chosen, facts, situationIntel) },
       ...(history ?? []).map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.text,

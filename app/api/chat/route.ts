@@ -1118,6 +1118,8 @@ export async function POST(req: NextRequest) {
         summary: situationIntel.situationSummary,
       });
     }
+    // Attach situation intel to payload so LLM can use it
+    (body as any).situationIntel = situationIntel.hasSituation ? situationIntel : undefined;
 
     const [allMemories, canonicalFacts] = await Promise.all([
       fetchMemoriesForUser(user.id),
@@ -1180,6 +1182,10 @@ export async function POST(req: NextRequest) {
       identityContext,
       dueDecisionReview: null,
     });
+    // Attach situation intel to payload for LLM system prompt
+    if (situationIntel.hasSituation) {
+      (payload as any).situationIntel = situationIntel;
+    }
 
     const out = await runLLM({ payload, proposed_mode, history });
 
