@@ -1094,7 +1094,7 @@ export async function POST(req: NextRequest) {
       strategyHistory.push({ step: "gel_intent_detected", type: detectedIntent.type, actionId: localActionId, description });
       return respond({
         mode: "ANALYST",
-        assistantText: `I noticed an action in your message:\n\n**${description}**\n\nShould I proceed? Reply **yes** to approve or **no** to cancel.`,
+        assistantText: `I noticed an action in your message:\n\n${description}\n\nShould I proceed? Tap Approve or Cancel below.`,
         pickedMemoryIds: [],
         extraStrategyHistory: strategyHistory,
       });
