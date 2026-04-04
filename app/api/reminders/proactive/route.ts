@@ -74,8 +74,10 @@ export async function GET(_req: NextRequest) {
     // Filter out internal system memories before surfacing
     const SYSTEM_PREFIXES = [
       "fact restored", "fact disputed", "fact historical", "fact active",
-      "fact superseded", "fact updated", "note:", "restored active",
+      "fact superseded", "fact updated", "fact marked", "restored active",
       "mark disputed", "mark historical", "status update",
+      "i live in manchester", "i live in london", "i live in",
+      "my timezone", "my name is", "i work", "i am a", "i am the",
     ];
 
     const userMemories = memories.filter(m => {
