@@ -12,7 +12,7 @@ type OutcomeRow = {
 
 type DecisionRow = {
   id: string;
-  text: string;
+  text_snapshot: string;
   review_count: number;
   outcome_count: number;
   last_reviewed_at: string | null;
@@ -91,7 +91,7 @@ export async function runPatternScan(userId: string): Promise<{
   // Fetch all decisions for this user
   const { data: decisions, error: dErr } = await supabase
     .from("decisions")
-    .select("id, text, review_count, outcome_count, last_reviewed_at, created_at, pattern_signal")
+    .select("id, text_snapshot, review_count, outcome_count, last_reviewed_at, created_at, pattern_signal")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(100);
