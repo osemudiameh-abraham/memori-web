@@ -8,6 +8,10 @@ type DigestOutcome = { text_snapshot: string; outcome_label: string; created_at:
 type DigestSummary = { facts: DigestFact[]; decisions: DigestDecision[]; outcomes: DigestOutcome[]; insight: string; counts: { facts: number; decisions: number; outcomes: number }; window: { since: string; until: string } };
 type DigestResponse = { ok: true; summary: DigestSummary } | { ok: false; error: string };
 
+type ImprovementSignal = { type: string; description: string; severity: "low" | "medium" | "high"; suggestion: string };
+type ImprovementReport = { summary: string; signals: ImprovementSignal[]; recall_accuracy_estimate: number; decisions_failed: number; decisions_total: number };
+type ImprovementResponse = { ok: true; report: ImprovementReport } | { ok: false; error: string };
+
 function fmtDate(v: string) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return v;
@@ -24,14 +28,20 @@ export default function DigestPage() {
   const [data, setData] = useState<DigestSummary|null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [improvement, setImprovement] = useState<ImprovementReport|null>(null);
 
   async function load() {
     setLoading(true); setError("");
     try {
-      const res = await fetch("/api/digest/weekly", { credentials:"include" });
-      const payload = (await res.json().catch(()=>({}))) as DigestResponse;
-      if (!res.ok || payload.ok===false) { setError(payload.ok===false?payload.error:"Unable to load digest."); return; }
+      const [digestRes, improveRes] = await Promise.all([
+        fetch("/api/digest/weekly", { credentials:"include" }),
+        fetch("/api/self-improve", { method:"POST", credentials:"include" }),
+      ]);
+      const payload = (await digestRes.json().catch(()=>({}))) as DigestResponse;
+      const improvePayload = (await improveRes.json().catch(()=>({}))) as ImprovementResponse;
+      if (!digestRes.ok || payload.ok===false) { setError(payload.ok===false?payload.error:"Unable to load digest."); return; }
       setData(payload.summary);
+      if (improvePayload.ok) setImprovement(improvePayload.report);
     } catch { setError("Unable to load digest."); }
     finally { setLoading(false); }
   }
@@ -80,6 +90,50 @@ export default function DigestPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Self-improvement report */}
+              {improvement && (
+                <div style={{ background:"rgba(255,255,255,0.90)", border:"1px solid rgba(0,0,0,0.08)", borderRadius:14, padding:"18px 20px", boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+                    <span style={{ fontSize:16 }}>🔍</span>
+                    <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:16, fontWeight:500, color:"#2A2825" }}>Weekly self-assessment</div>
+                    <span style={{ fontSize:11, fontWeight:600, letterSpacing:"0.07em", padding:"2px 8px", borderRadius:100, background:"rgba(0,0,0,0.05)", color:"#8A8785" }}>AUTO</span>
+                  </div>
+                  <p style={{ fontSize:14.5, color:"#3C3A38", lineHeight:1.60, marginBottom:improvement.signals.length > 0 ? 14 : 0 }}>{improvement.summary}</p>
+                  {improvement.signals.length > 0 && (
+                    <div style={{ display:"grid", gap:8 }}>
+                      {improvement.signals.map((s, i) => {
+                        const sevColor = s.severity === "high"
+                          ? { bg:"rgba(255,240,240,0.90)", border:"rgba(185,60,60,0.18)", text:"#6A1A1A", dot:"#C04040" }
+                          : s.severity === "medium"
+                          ? { bg:"rgba(255,248,225,0.90)", border:"rgba(185,150,30,0.20)", text:"#5A3A00", dot:"#C09020" }
+                          : { bg:"rgba(235,245,255,0.90)", border:"rgba(80,130,200,0.18)", text:"#1A3A70", dot:"#4080C0" };
+                        return (
+                          <div key={i} style={{ padding:"12px 14px", borderRadius:11, background:sevColor.bg, border:`1px solid ${sevColor.border}` }}>
+                            <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:4 }}>
+                              <span style={{ width:6, height:6, borderRadius:"50%", background:sevColor.dot, display:"inline-block", flexShrink:0 }}/>
+                              <span style={{ fontSize:13, fontWeight:500, color:sevColor.text }}>{s.description}</span>
+                            </div>
+                            <div style={{ fontSize:12.5, color:sevColor.text, opacity:0.80, lineHeight:1.50, paddingLeft:12 }}>{s.suggestion}</div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div style={{ display:"flex", gap:12, marginTop:14, paddingTop:14, borderTop:"1px solid rgba(0,0,0,0.06)" }}>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:22, color:"#1C1A18" }}>{improvement.recall_accuracy_estimate}%</div>
+                      <div style={{ fontSize:11, color:"#ABABAB", marginTop:2 }}>recall score</div>
+                    </div>
+                    <div style={{ textAlign:"center" }}>
+                      <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:22, color:"#1C1A18" }}>{improvement.decisions_failed}/{improvement.decisions_total}</div>
+                      <div style={{ fontSize:11, color:"#ABABAB", marginTop:2 }}>decisions failed</div>
+                    </div>
+                    <div style={{ flex:1 }}/>
+                    <a href="/reviews" style={{ display:"inline-flex", alignItems:"center", alignSelf:"center", gap:5, padding:"7px 14px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.80)", color:"#3C3A38", fontSize:13.5, textDecoration:"none" }}>Review decisions →</a>
+                  </div>
+                </div>
+              )}
 
               {/* Facts */}
               {data.facts.length > 0 && (
