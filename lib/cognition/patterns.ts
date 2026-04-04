@@ -13,11 +13,11 @@ type OutcomeRow = {
 type DecisionRow = {
   id: string;
   text_snapshot: string;
-  review_count: number;
-  outcome_count: number;
-  last_reviewed_at: string | null;
+  outcome_count: number | null;
+  reviewed_at: string | null;
+  review_due_at: string | null;
   created_at: string;
-  pattern_signal: string | null;
+  archived: boolean | null;
 };
 
 type PatternResult = {
@@ -34,11 +34,11 @@ function detectDecisionPattern(
   outcomes: OutcomeRow[]
 ): string | null {
   const decisionOutcomes = outcomes.filter(o => o.decision_id === decision.id);
-  const reviewCount = decision.review_count ?? 0;
+  const storedCount = Number(decision.outcome_count ?? 0);
   const outcomeCount = decisionOutcomes.length;
 
   // Pattern 1: Never reviewed despite being old
-  if (reviewCount === 0 && outcomeCount === 0) {
+  if (storedCount === 0 && outcomeCount === 0) {
     const agedays = daysBetween(decision.created_at, new Date().toISOString());
     if (agedays > 14) {
       return "This decision has not been reviewed in over 2 weeks. Consider closing the loop.";
@@ -47,12 +47,12 @@ function detectDecisionPattern(
   }
 
   // Pattern 2: Repeatedly reviewed — recurring decision
-  if (reviewCount >= 5) {
-    return `Reviewed ${reviewCount} times. This may be a recurring decision worth systematising.`;
+  if (storedCount >= 5) {
+    return `Reviewed ${storedCount} times. This may be a recurring decision worth systematising.`;
   }
 
-  if (reviewCount >= 3) {
-    return `Reviewed ${reviewCount} times. This decision keeps coming up — worth a deeper look.`;
+  if (storedCount >= 3) {
+    return `Reviewed ${storedCount} times. This decision keeps coming up — worth a deeper look.`;
   }
 
   // Pattern 3: Consistent failure
@@ -91,7 +91,7 @@ export async function runPatternScan(userId: string): Promise<{
   // Fetch all decisions for this user
   const { data: decisions, error: dErr } = await supabase
     .from("decisions")
-    .select("id, text_snapshot, review_count, outcome_count, last_reviewed_at, created_at, pattern_signal")
+    .select("id, text_snapshot, outcome_count, reviewed_at, review_due_at, created_at, archived")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(100);
@@ -117,16 +117,7 @@ export async function runPatternScan(userId: string): Promise<{
   for (const decision of decisions) {
     const signal = detectDecisionPattern(decision as DecisionRow, outcomeRows);
     signals.push({ decisionId: decision.id, signal });
-
-    // Only update if signal changed
-    if (signal !== decision.pattern_signal) {
-      await supabase
-        .from("decisions")
-        .update({ pattern_signal: signal })
-        .eq("id", decision.id)
-        .eq("user_id", userId);
-      updated++;
-    }
+    if (signal) updated++;
   }
 
   return {
