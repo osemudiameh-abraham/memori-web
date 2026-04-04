@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
         const subject = params.subject ?? "following up";
         const recipientName = recipient ?? "them";
 
-        // Look up email in entity graph — prefer person type
+        // Look up email in entity graph
         let recipientEmail: string | null = null;
         if (recipient) {
           const { data: entities } = await supabase
@@ -169,30 +169,66 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // Fetch identity context for smarter draft
+        // Fetch identity context
         const { data: identityData } = await supabase
           .from("memory_facts")
           .select("fact_key, value_text")
           .eq("user_id", authData.user.id)
           .eq("status", "active")
           .limit(10);
-
         const identityContext: Record<string, string> = {};
         for (const fact of identityData ?? []) {
           identityContext[fact.fact_key] = fact.value_text;
         }
 
-        // Draft the email body using LLM with full context
+        // Draft email body via LLM
         const bodyText = await draftEmailWithLLM({
           senderName: identityContext["self_name"] ?? null,
           senderRole: identityContext["self_role"] ?? null,
           senderCompany: identityContext["self_company"] ?? null,
-          recipientName: recipientName,
+          recipientName,
           subject,
           identityContext,
         });
 
-        // Build Gmail compose URL — opens pre-filled in user's own Gmail
+        // Check for Gmail API token
+        const { data: gmailToken } = await supabase
+          .from("oauth_tokens")
+          .select("access_token, expires_at")
+          .eq("user_id", authData.user.id)
+          .eq("provider", "gmail")
+          .maybeSingle();
+
+        // If Gmail API token exists and recipient email known — send directly
+        if (gmailToken?.access_token && recipientEmail) {
+          try {
+            const emailLines = [
+              `To: ${recipientEmail}`,
+              `Subject: ${subject}`,
+              `Content-Type: text/plain; charset=utf-8`,
+              `MIME-Version: 1.0`,
+              ``,
+              bodyText,
+            ].join("\r\n");
+            const encoded = Buffer.from(emailLines).toString("base64url");
+            const gmailRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${gmailToken.access_token}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ raw: encoded }),
+            });
+            if (gmailRes.ok) {
+              message = `✓ Email sent to ${recipientName} (${recipientEmail}) directly from your Gmail — subject: "${subject}".`;
+              break;
+            }
+          } catch {
+            // Fall through to compose URL
+          }
+        }
+
+        // Fallback: open Gmail compose URL
         const gmailUrl = recipientEmail
           ? `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`
           : null;

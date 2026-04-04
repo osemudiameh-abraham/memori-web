@@ -263,6 +263,12 @@ export default function SettingsPage() {
                       <SettingRow label="Email address" sub="Your Memori account email">
                         <span style={{ fontSize:14, color:"#4A4845" }}>{email ?? "—"}</span>
                       </SettingRow>
+                      <SettingRow label="Gmail" sub="Connect Gmail to send emails directly from your account">
+                        <a href="/api/auth/gmail" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:9, background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, textDecoration:"none" }}>
+                          Connect →
+                        </a>
+                      </SettingRow>
+
                       <SettingRow label="Sign out" sub="Sign out of Memori on this device">
                         <button onClick={() => void signOut()} style={{ padding:"7px 14px", borderRadius:9, border:"1px solid rgba(0,0,0,0.14)", background:"rgba(255,255,255,0.80)", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, cursor:"pointer", color:"#3C3A38" }}>
                           Sign out
