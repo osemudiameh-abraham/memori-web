@@ -71,8 +71,25 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ ok: true, reminder: null })
     }
 
+    // Filter out internal system memories before surfacing
+    const SYSTEM_PREFIXES = [
+      "fact restored", "fact disputed", "fact historical", "fact active",
+      "fact superseded", "fact updated", "note:", "restored active",
+      "mark disputed", "mark historical", "status update",
+    ];
+
+    const userMemories = memories.filter(m => {
+      if (!m.text) return false;
+      const lower = m.text.toLowerCase().trim();
+      return !SYSTEM_PREFIXES.some(prefix => lower.startsWith(prefix));
+    });
+
+    if (userMemories.length === 0) {
+      return NextResponse.json({ ok: true, reminder: null });
+    }
+
     // Score and pick best
-    const ranked = memories
+    const ranked = userMemories
       .map(m => ({
         ...m,
         score: scoreMemory(m),
@@ -81,9 +98,14 @@ export async function GET(_req: NextRequest) {
 
     const chosen = ranked[0]
 
+    // Truncate long text cleanly
+    const snippet = chosen.text.length > 80
+      ? chosen.text.slice(0, 77).trimEnd() + "…"
+      : chosen.text;
+
     const when = timeAgo(chosen.created_at)
 
-    const message = `You mentioned "${chosen.text}" ${when}. This might still be important. Do you want to revisit it?`
+    const message = `You mentioned "${snippet}" ${when}. Worth revisiting?`
 
     return NextResponse.json({
       ok: true,

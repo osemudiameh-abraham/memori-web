@@ -702,6 +702,8 @@ export default function Page() {
         @keyframes mpulse{0%,100%{box-shadow:0 0 0 0 rgba(90,168,216,0.42);}50%{box-shadow:0 0 0 9px rgba(90,168,216,0);}}
         @keyframes orbpop{from{opacity:0;transform:scale(0.65);}to{opacity:1;transform:scale(1);}}
         @keyframes mspin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+        @keyframes mlistenpulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+        .listening-wave{animation:mlistenpulse 1.2s ease infinite;}
       `}</style>
 
       <div className="app">
@@ -805,16 +807,37 @@ export default function Page() {
           {/* Toasts */}
           <div className="toasts">
             {reminder && (
-              <div className="toast toast-reminder">
-                <span style={{ fontSize:13, flexShrink:0 }}>💡</span>
+              <div style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"9px 14px",
+                borderRadius:10,
+                background:"rgba(255,255,255,0.80)",
+                border:"1px solid rgba(0,0,0,0.09)",
+                backdropFilter:"blur(12px)",
+                fontSize:13.5,
+                color:"#4A4845",
+                lineHeight:1.45,
+              }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:"#5BA8D8", flexShrink:0, display:"inline-block" }}/>
                 <span style={{ flex:1 }}>{reminder}</span>
+                <button onClick={() => setReminder(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>×</button>
               </div>
             )}
             {voiceError && (
-              <div className="toast toast-error">
-                <span style={{ fontSize:13, flexShrink:0 }}>🎤</span>
+              <div style={{
+                display:"flex", alignItems:"center", gap:10,
+                padding:"9px 14px",
+                borderRadius:10,
+                background:"rgba(255,240,240,0.90)",
+                border:"1px solid rgba(185,60,60,0.15)",
+                backdropFilter:"blur(12px)",
+                fontSize:13.5,
+                color:"#6A1A1A",
+                lineHeight:1.45,
+              }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:"#D05050", flexShrink:0, display:"inline-block" }}/>
                 <span style={{ flex:1 }}>{voiceError}</span>
-                <button className="toast-close" onClick={() => setVoiceError(null)} aria-label="Dismiss">×</button>
+                <button onClick={() => setVoiceError(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>×</button>
               </div>
             )}
             {!bannerHidden && (
@@ -871,10 +894,18 @@ export default function Page() {
                         className="icon-btn"
                         onClick={handleMicClick}
                         disabled={voiceState === "connecting" || voiceState === "requesting" || voiceState === "processing"}
-                        aria-label={voiceState === "listening" ? "Stop" : "Voice"}
-                        style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785" }}
+                        aria-label={voiceState === "listening" ? "Stop recording" : "Voice input"}
+                        style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785", width:36, height:36, borderRadius:8, background: voiceState === "listening" ? "rgba(91,168,216,0.10)" : "transparent" }}
                       >
-                        <WaveformIcon/>
+                        <span className={voiceState === "listening" ? "listening-wave" : ""}>
+                          {voiceState === "listening" ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                              <line x1="4" y1="12" x2="4" y2="12"/><line x1="8" y1="8" x2="8" y2="16"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="16" y1="8" x2="16" y2="16"/><line x1="20" y1="12" x2="20" y2="12"/>
+                            </svg>
+                          ) : (
+                            <WaveformIcon/>
+                          )}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -915,12 +946,7 @@ export default function Page() {
                   </div>
                 </div>
               )}
-              {voiceState === "listening" && (
-                <div className="msg-row assistant">
-                  <div className="assistant-icon"><MemoriIcon size={26} spinning={false}/></div>
-                  <div className="bubble assistant" style={{ background:"rgba(228,244,255,0.90)", borderColor:"rgba(80,145,200,0.18)", color:"#265580", fontSize:14 }}>🎤 Listening…</div>
-                </div>
-              )}
+
               <div ref={messagesEndRef}/>
             </div>
           )}
@@ -953,8 +979,12 @@ export default function Page() {
                         <SendIcon/>
                       </button>
                     ) : (
-                      <button className="icon-btn" onClick={handleMicClick} disabled={voiceState==="connecting"||voiceState==="requesting"||voiceState==="processing"} aria-label="Voice" style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785" }}>
-                        <WaveformIcon/>
+                      <button className="icon-btn" onClick={handleMicClick} disabled={voiceState==="connecting"||voiceState==="requesting"||voiceState==="processing"} aria-label="Voice" style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785", width:36, height:36, borderRadius:8 }}>
+                        {voiceState === "listening" ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
+                        ) : (
+                          <WaveformIcon/>
+                        )}
                       </button>
                     )}
                   </div>
