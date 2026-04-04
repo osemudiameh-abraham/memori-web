@@ -77,7 +77,7 @@ export async function GET(_req: NextRequest) {
       "fact superseded", "fact updated", "fact marked", "restored active",
       "mark disputed", "mark historical", "status update",
       "i live in manchester", "i live in london", "i live in",
-      "my timezone", "my name is", "i work", "i am a", "i am the",
+      "my timezone", "my name is", "i work", "i am a", "i am the", "self city", "self name", "self role", "self company", "self timezone",
     ];
 
     const userMemories = memories.filter(m => {
