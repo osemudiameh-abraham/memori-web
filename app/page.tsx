@@ -446,26 +446,25 @@ export default function Page() {
         }
 
         .chip{
-          display:flex;align-items:center;gap:6px;
-          padding:7px 14px 7px 11px;
-          background:rgba(255,255,255,0.68);
-          border:1px solid rgba(0,0,0,0.10);
-          border-radius:10px;
-          font-size:13.5px;font-weight:400;
-          color:#4A4845;
+          display:inline-flex;align-items:center;gap:6px;
+          padding:0 10px;
+          height:32px;
+          background:rgb(250,249,245);
+          border:0.5px solid rgba(31,30,29,0.15);
+          border-radius:8px;
+          font-size:14px;font-weight:400;
+          color:rgb(61,61,58);
           cursor:pointer;font-family:'DM Sans',sans-serif;
-          transition:all 140ms ease;
-          backdrop-filter:blur(8px);
+          transition:all 120ms ease;
           white-space:nowrap;
         }
-        .chip svg{opacity:0.55;flex-shrink:0;}
+        .chip svg{opacity:0.60;flex-shrink:0;}
         .chip:hover{
-          background:rgba(255,255,255,0.97);
-          border-color:rgba(0,0,0,0.16);
+          background:rgba(240,238,232,1);
+          border-color:rgba(31,30,29,0.22);
           color:#1C1A18;
-          box-shadow:0 2px 8px rgba(0,0,0,0.07);
         }
-        .chip:hover svg{opacity:0.8;}
+        .chip:hover svg{opacity:0.9;}
 
         /* ── Messages ── */
         .messages{
@@ -837,7 +836,7 @@ export default function Page() {
             <div className="empty">
               {/* Greeting row — icon inline with text */}
               <div className="greeting-row">
-                <MemoriIcon size={48} spinning={false}/>
+                <MemoriIcon size={96} spinning={false}/>
                 <h1 className="greeting-text">{greetingPhrase}</h1>
               </div>
 
