@@ -198,12 +198,50 @@ export default function Page() {
   async function handleApprove(messageIndex: number, approved: boolean) {
     if (approving) return;
     setApproving(String(messageIndex));
+    // Mark message as approved/cancelled immediately
     setMessages(prev => {
       const updated = [...prev];
       updated[messageIndex] = { ...updated[messageIndex], approved: approved ? "yes" : "no" };
       return updated;
     });
-    await sendMessage(approved ? "yes" : "no");
+    // Extract intent details from the message text to execute
+    const msg = messages[messageIndex];
+    const text = msg?.text ?? "";
+    // Parse kind from message — look for known action types
+    let kind = "none";
+    let params: Record<string, string | null> = {};
+    if (text.includes("email") || text.includes("Email")) {
+      kind = "send_email";
+      const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
+      const subjectMatch = text.match(/"([^"]+)"/);
+      params = { recipient: recipientMatch?.[1] ?? null, subject: subjectMatch?.[1] ?? null };
+    } else if (text.includes("reminder") || text.includes("Reminder")) {
+      kind = "create_reminder";
+      const subjectMatch = text.match(/"([^"]+)"/);
+      const timeMatch = text.match(/for ([^.]+)/);
+      params = { subject: subjectMatch?.[1] ?? text, time: timeMatch?.[1] ?? null };
+    } else if (text.includes("meeting") || text.includes("Meeting")) {
+      kind = "schedule_meeting";
+      const recipientMatch = text.match(/with ([A-Z][a-z]+)/);
+      params = { recipient: recipientMatch?.[1] ?? null, time: null };
+    } else if (text.includes("draft") || text.includes("Draft")) {
+      kind = "draft_message";
+      const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
+      params = { recipient: recipientMatch?.[1] ?? null, subject: null };
+    }
+    try {
+      const res = await fetch("/api/actions/execute", {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, params, approved }),
+      });
+      const data = await res.json() as { ok: boolean; message?: string };
+      if (data.ok && data.message) {
+        setMessages(prev => [...prev, { role: "assistant", text: data.message! }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", text: approved ? "Action noted. I'll follow up shortly." : "Understood — action cancelled." }]);
+    }
     setApproving(null);
   }
 
