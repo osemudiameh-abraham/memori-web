@@ -986,7 +986,7 @@ export default function Page() {
                       <MemoriIcon size={26} spinning={false}/>
                     </div>
                   )}
-                  {m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved ? (
+                  {m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") ? (
                     <div className="bubble assistant" style={{ padding:"14px 16px" }}>
                       <div style={{ fontSize:14.5, lineHeight:1.65, marginBottom:14, color:"#1C1A18", whiteSpace:"pre-wrap" }}>{m.text}</div>
                       <div style={{ display:"flex", gap:8 }}>

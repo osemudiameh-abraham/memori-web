@@ -29,9 +29,16 @@ async function executeCreateReminder(
   const time = params.time ?? null;
 
   // Store as a memory note with reminder flag
+  // Clean up subject — remove quotes and "Remind me to" prefix
+  const cleanSubject = subject
+    .replace(/^["']|["']$/g, "")
+    .replace(/^remind me to /i, "")
+    .replace(/^reminder:\s*/i, "")
+    .trim();
+
   const reminderText = time
-    ? `Reminder: ${subject} (${time})`
-    : `Reminder: ${subject}`;
+    ? `Reminder: ${cleanSubject} (${time})`
+    : `Reminder: ${cleanSubject}`;
 
   const { error } = await supabase
     .from("memories_structured")
@@ -46,8 +53,8 @@ async function executeCreateReminder(
   if (error) throw new Error(error.message);
 
   return time
-    ? `Done. I've set a reminder: "${subject}" for ${time}. I'll surface it when it's due.`
-    : `Done. I've set a reminder: "${subject}". I'll surface it in your next session.`;
+    ? `Done — reminder set: "${cleanSubject}" for ${time}. I'll surface it when it's due.`
+    : `Done — reminder set: "${cleanSubject}". I'll surface it in your next session.`;
 }
 
 async function executeDraftMessage(
