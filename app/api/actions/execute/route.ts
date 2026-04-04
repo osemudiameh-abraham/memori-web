@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Resend } from "resend";
 
 export const runtime = "nodejs";
 
@@ -106,10 +107,63 @@ export async function POST(req: NextRequest) {
         message = await executeDraftMessage(params);
         break;
 
-      case "send_email":
-        // Email connector — Phase 3 Step 4
-        message = `Action queued. I'll send the email to ${params.recipient ?? "them"} about "${params.subject ?? "this topic"}". Email connector coming next — I'll confirm once it's sent.`;
+      case "send_email": {
+        const recipient = params.recipient ?? null;
+        const subject = params.subject ?? "following up";
+        const recipientName = recipient ?? "them";
+
+        // If params.email provided directly — store it first
+        if (params.email && recipient) {
+          await supabase.from("situation_entities").upsert({
+            user_id: authData.user.id,
+            entity_text: recipient,
+            entity_type: "person",
+            email: params.email,
+            confidence: 1.0,
+            occurrence_count: 1,
+          }, { onConflict: "user_id,entity_text,entity_type", ignoreDuplicates: false });
+        }
+
+        // Look up email in entity graph
+        let recipientEmail: string | null = null;
+        if (recipient) {
+          const { data: entity } = await supabase
+            .from("situation_entities")
+            .select("email")
+            .eq("user_id", authData.user.id)
+            .ilike("entity_text", recipient)
+            .maybeSingle();
+          recipientEmail = entity?.email ?? null;
+        }
+
+        // If no email stored — ask for it
+        if (!recipientEmail) {
+          message = `I don\'t have an email address for ${recipientName} yet.\n\nReply with their email address and I\'ll send it right away. For example: james@example.com`;
+          break;
+        }
+
+        // Send via Resend
+        try {
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          const fromEmail = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+          await resend.emails.send({
+            from: fromEmail,
+            to: recipientEmail,
+            subject: `${subject}`,
+            html: `<p>Hi ${recipientName},</p><p>This message was sent via Memori.</p><p>Regarding: ${subject}</p>`,
+          });
+          // Log execution
+          await supabase.from("pending_actions").update({
+            status: "executed",
+            executed_at: new Date().toISOString(),
+            result: { recipient: recipientEmail, subject },
+          }).eq("user_id", authData.user.id).eq("kind", "send_email").eq("status", "approved");
+          message = `✓ Email sent to ${recipientName} (${recipientEmail}) about "${subject}".`;
+        } catch (emailErr: unknown) {
+          message = `Failed to send email: ${emailErr instanceof Error ? emailErr.message : "unknown error"}`;
+        }
         break;
+      }
 
       case "schedule_meeting":
         message = `Action queued. Meeting scheduling with ${params.recipient ?? "them"} ${params.time ? `for ${params.time}` : ""} will be available once the calendar connector is ready.`;
