@@ -766,10 +766,12 @@ export default function Page() {
         .mobile-headline{font-family:'Lora',Georgia,serif;font-size:clamp(24px,8vw,32px);font-weight:400;color:#2A2825;line-height:1.22;letter-spacing:-0.3px;animation:gfade 0.4s ease 0.18s both;}
 
         @media(max-width:700px){
-          .sidebar{display:none;}
-          .mobile-nav{display:flex;width:100%;flex-shrink:0;}
-          .empty,.bottom-bar,.messages{display:none!important;}
-          .mobile-input-area,.mobile-messages,.mobile-empty{display:flex!important;}
+          .sidebar,.main,.empty,.bottom-bar,.messages{display:none!important;}
+          .app{flex-direction:column;height:100dvh;}
+          .mobile-nav{display:flex!important;width:100%;flex-shrink:0;}
+          .mobile-empty{flex:1;display:flex!important;flex-direction:column;align-items:center;justify-content:center;}
+          .mobile-messages{flex:1;display:flex!important;}
+          .mobile-input-area{display:flex!important;flex-shrink:0;}
         }
         @media(min-width:701px){
           .mobile-nav,.mobile-input-area,.mobile-messages,.mobile-empty{display:none!important;}
