@@ -2,278 +2,143 @@
 
 import { useEffect, useState } from "react";
 
-type DigestFact = {
-  text: string;
-  created_at: string;
-};
+type DigestFact = { text: string; created_at: string };
+type DigestDecision = { text_snapshot: string; created_at: string };
+type DigestOutcome = { text_snapshot: string; outcome_label: string; created_at: string };
+type DigestSummary = { facts: DigestFact[]; decisions: DigestDecision[]; outcomes: DigestOutcome[]; insight: string; counts: { facts: number; decisions: number; outcomes: number }; window: { since: string; until: string } };
+type DigestResponse = { ok: true; summary: DigestSummary } | { ok: false; error: string };
 
-type DigestDecision = {
-  text_snapshot: string;
-  created_at: string;
-};
-
-type DigestOutcome = {
-  text_snapshot: string;
-  outcome_label: string;
-  created_at: string;
-};
-
-type DigestSummary = {
-  facts: DigestFact[];
-  decisions: DigestDecision[];
-  outcomes: DigestOutcome[];
-  insight: string;
-  counts: {
-    facts: number;
-    decisions: number;
-    outcomes: number;
-  };
-  window: {
-    since: string;
-    until: string;
-  };
-};
-
-type DigestResponse =
-  | {
-      ok: true;
-      summary: DigestSummary;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
-
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+function fmtDate(v: string) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  return d.toLocaleDateString("en-GB", { day:"numeric", month:"short" });
 }
 
-function Section(props: {
-  title: string;
-  emptyText: string;
-  children: React.ReactNode;
-  count: number;
-}) {
-  return (
-    <section>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 600, margin: 0 }}>{props.title}</h2>
-        <span style={{ fontSize: 12, opacity: 0.7 }}>{props.count}</span>
-      </div>
-
-      {props.count === 0 ? (
-        <div
-          style={{
-            padding: 12,
-            border: "1px solid #e5e5e5",
-            borderRadius: 10,
-            background: "#fafafa",
-            fontSize: 14,
-            opacity: 0.8,
-          }}
-        >
-          {props.emptyText}
-        </div>
-      ) : (
-        <div style={{ display: "grid", gap: 10 }}>{props.children}</div>
-      )}
-    </section>
-  );
-}
-
-function Item(props: {
-  children: React.ReactNode;
-  meta?: string;
-}) {
-  return (
-    <div
-      style={{
-        padding: 12,
-        border: "1px solid #e5e5e5",
-        borderRadius: 10,
-        background: "#ffffff",
-      }}
-    >
-      <div style={{ fontSize: 14, lineHeight: 1.5 }}>{props.children}</div>
-      {props.meta ? (
-        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.65 }}>{props.meta}</div>
-      ) : null}
-    </div>
-  );
-}
+const OUTCOME_COLORS: Record<string,{bg:string;text:string}> = {
+  worked:  { bg:"rgba(20,140,60,0.10)",  text:"#1A5C32" },
+  partial: { bg:"rgba(180,140,0,0.10)",  text:"#6A4A00" },
+  failed:  { bg:"rgba(160,30,30,0.10)",  text:"#6A1A1A" },
+};
 
 export default function DigestPage() {
-  const [data, setData] = useState<DigestSummary | null>(null);
+  const [data, setData] = useState<DigestSummary|null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function loadDigest() {
-    setLoading(true);
-    setError("");
-
+  async function load() {
+    setLoading(true); setError("");
     try {
-      const res = await fetch("/api/digest/weekly", {
-        credentials: "include",
-      });
-
-      const payload = (await res.json().catch(() => ({}))) as DigestResponse;
-
-      if (!res.ok || payload.ok === false) {
-        setData(null);
-        setError(payload.ok === false ? payload.error : "Unable to load digest.");
-        return;
-      }
-
+      const res = await fetch("/api/digest/weekly", { credentials:"include" });
+      const payload = (await res.json().catch(()=>({}))) as DigestResponse;
+      if (!res.ok || payload.ok===false) { setError(payload.ok===false?payload.error:"Unable to load digest."); return; }
       setData(payload.summary);
-    } catch {
-      setData(null);
-      setError("Unable to load digest.");
-    } finally {
-      setLoading(false);
-    }
+    } catch { setError("Unable to load digest."); }
+    finally { setLoading(false); }
   }
 
-  useEffect(() => {
-    void loadDigest();
-  }, []);
+  useEffect(() => { void load(); }, []);
+
+  const card: React.CSSProperties = { background:"rgba(255,255,255,0.90)", border:"1px solid rgba(0,0,0,0.08)", borderRadius:14, padding:"16px 18px", boxShadow:"0 1px 6px rgba(0,0,0,0.05)" };
 
   return (
-    <main style={{ maxWidth: 860, margin: "40px auto", padding: 16 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <h1 style={{ margin: 0 }}>Your Week with Memori</h1>
-          <div style={{ marginTop: 8, fontSize: 14, opacity: 0.7 }}>
-            Weekly memory digest preview from your recent activity.
+    <>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#F5F4F0;color:#1C1A18;}`}</style>
+      <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse 80% 60% at 50% -10%,rgba(255,255,255,0.98) 0%,transparent 60%),#F5F4F0" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 24px", borderBottom:"1px solid rgba(0,0,0,0.07)", background:"rgba(245,244,240,0.80)", backdropFilter:"blur(20px)", position:"sticky", top:0, zIndex:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <a href="/" style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)", color:"#3C3A38", fontSize:13.5, textDecoration:"none" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Home
+            </a>
+            <span style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825" }}>Weekly Digest</span>
           </div>
+          <button onClick={() => void load()} disabled={loading} style={{ padding:"7px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)", color:"#3C3A38", fontSize:13.5, cursor:"pointer", fontFamily:"inherit" }}>{loading?"Refreshing…":"Refresh"}</button>
         </div>
+        <div style={{ maxWidth:680, margin:"0 auto", padding:"32px 24px 60px" }}>
+          {loading ? <div style={{ textAlign:"center", padding:60, color:"#8A8785", fontSize:14 }}>Loading your digest…</div>
+          : error ? <div style={{ padding:"12px 16px", borderRadius:12, background:"rgba(255,240,240,0.95)", border:"1px solid rgba(185,60,60,0.18)", color:"#6A1A1A", fontSize:14 }}>{error}</div>
+          : !data ? <div style={{ textAlign:"center", padding:60, color:"#8A8785" }}>No data available.</div>
+          : (
+            <div style={{ display:"grid", gap:16 }}>
+              {/* Insight */}
+              <div style={{ ...card, background:"rgba(248,248,255,0.95)", borderColor:"rgba(100,100,200,0.14)" }}>
+                <div style={{ fontSize:11, fontWeight:600, letterSpacing:"0.09em", textTransform:"uppercase", color:"#5858A0", marginBottom:10 }}>Weekly insight</div>
+                <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:18, lineHeight:1.58, color:"#1C1A18" }}>{data.insight}</div>
+                <div style={{ marginTop:12, fontSize:12, color:"#ABABAB" }}>{fmtDate(data.window.since)} → {fmtDate(data.window.until)}</div>
+              </div>
 
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button onClick={() => void loadDigest()} disabled={loading}>
-            {loading ? "Refreshing..." : "Refresh"}
-          </button>
-          <button onClick={() => (window.location.href = "/")}>Back home</button>
+              {/* Stats */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:10 }}>
+                {[
+                  { label:"Facts learned",    value:data.counts.facts,     icon:"🧠" },
+                  { label:"Decisions made",   value:data.counts.decisions, icon:"⚖️" },
+                  { label:"Outcomes logged",  value:data.counts.outcomes,  icon:"📌" },
+                ].map(s => (
+                  <div key={s.label} style={card}>
+                    <div style={{ fontSize:18, marginBottom:8 }}>{s.icon}</div>
+                    <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:28, fontWeight:400, color:"#1C1A18", lineHeight:1 }}>{s.value}</div>
+                    <div style={{ fontSize:12, color:"#8A8785", marginTop:6 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Facts */}
+              {data.facts.length > 0 && (
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#ABABAB", marginBottom:10 }}>What Memori learned</div>
+                  <div style={{ display:"grid", gap:8 }}>
+                    {data.facts.map((f,i) => (
+                      <div key={i} style={card}>
+                        <div style={{ fontSize:15, lineHeight:1.58, color:"#1C1A18" }}>{f.text}</div>
+                        <div style={{ fontSize:12, color:"#ABABAB", marginTop:6 }}>{fmtDate(f.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Decisions */}
+              {data.decisions.length > 0 && (
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#ABABAB", marginBottom:10 }}>Decisions you made</div>
+                  <div style={{ display:"grid", gap:8 }}>
+                    {data.decisions.map((d,i) => (
+                      <div key={i} style={card}>
+                        <div style={{ fontSize:15, lineHeight:1.58, color:"#1C1A18" }}>{d.text_snapshot}</div>
+                        <div style={{ fontSize:12, color:"#ABABAB", marginTop:6 }}>{fmtDate(d.created_at)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Outcomes */}
+              {data.outcomes.length > 0 && (
+                <div>
+                  <div style={{ fontSize:13, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#ABABAB", marginBottom:10 }}>Outcomes logged</div>
+                  <div style={{ display:"grid", gap:8 }}>
+                    {data.outcomes.map((o,i) => {
+                      const oc = OUTCOME_COLORS[o.outcome_label] ?? { bg:"rgba(0,0,0,0.05)", text:"#3C3A38" };
+                      return (
+                        <div key={i} style={card}>
+                          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                            <span style={{ padding:"2px 9px", borderRadius:100, fontSize:11, fontWeight:600, letterSpacing:"0.07em", background:oc.bg, color:oc.text }}>{o.outcome_label}</span>
+                            <span style={{ fontSize:12, color:"#ABABAB" }}>{fmtDate(o.created_at)}</span>
+                          </div>
+                          <div style={{ fontSize:15, lineHeight:1.58, color:"#1C1A18" }}>{o.text_snapshot}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {!data.facts.length && !data.decisions.length && !data.outcomes.length && (
+                <div style={{ textAlign:"center", padding:"48px 24px", color:"#8A8785", fontSize:15 }}>No activity this week yet. Start a conversation.</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {loading ? (
-        <div style={{ marginTop: 20 }}>Loading...</div>
-      ) : error ? (
-        <div
-          style={{
-            marginTop: 20,
-            padding: 12,
-            border: "1px solid #f0d0d0",
-            background: "#fff5f5",
-            borderRadius: 10,
-          }}
-        >
-          {error}
-        </div>
-      ) : !data ? (
-        <div style={{ marginTop: 20 }}>No data.</div>
-      ) : (
-        <div style={{ marginTop: 20, display: "grid", gap: 20 }}>
-          <div
-            style={{
-              padding: 16,
-              border: "1px solid #e5e5e5",
-              borderRadius: 12,
-              background: "#fafafa",
-            }}
-          >
-            <div style={{ fontSize: 14, opacity: 0.7 }}>Insight</div>
-            <div style={{ marginTop: 8, fontSize: 18, lineHeight: 1.5 }}>{data.insight}</div>
-            <div style={{ marginTop: 12, fontSize: 12, opacity: 0.65 }}>
-              Window: {formatDate(data.window.since)} → {formatDate(data.window.until)}
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 12,
-            }}
-          >
-            <div
-              style={{
-                padding: 12,
-                border: "1px solid #e5e5e5",
-                borderRadius: 10,
-                background: "#ffffff",
-              }}
-            >
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Facts learned</div>
-              <div style={{ marginTop: 6, fontSize: 24, fontWeight: 700 }}>{data.counts.facts}</div>
-            </div>
-
-            <div
-              style={{
-                padding: 12,
-                border: "1px solid #e5e5e5",
-                borderRadius: 10,
-                background: "#ffffff",
-              }}
-            >
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Decisions made</div>
-              <div style={{ marginTop: 6, fontSize: 24, fontWeight: 700 }}>{data.counts.decisions}</div>
-            </div>
-
-            <div
-              style={{
-                padding: 12,
-                border: "1px solid #e5e5e5",
-                borderRadius: 10,
-                background: "#ffffff",
-              }}
-            >
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Outcomes logged</div>
-              <div style={{ marginTop: 6, fontSize: 24, fontWeight: 700 }}>{data.counts.outcomes}</div>
-            </div>
-          </div>
-
-          <Section
-            title="What Memori learned"
-            count={data.facts.length}
-            emptyText="No new facts were learned this week."
-          >
-            {data.facts.map((fact, index) => (
-              <Item key={`${fact.created_at}-${index}`} meta={formatDate(fact.created_at)}>
-                {fact.text}
-              </Item>
-            ))}
-          </Section>
-
-          <Section
-            title="Decisions you made"
-            count={data.decisions.length}
-            emptyText="No decisions were logged this week."
-          >
-            {data.decisions.map((decision, index) => (
-              <Item key={`${decision.created_at}-${index}`} meta={formatDate(decision.created_at)}>
-                {decision.text_snapshot}
-              </Item>
-            ))}
-          </Section>
-
-          <Section
-            title="Outcomes logged"
-            count={data.outcomes.length}
-            emptyText="No outcomes were logged this week."
-          >
-            {data.outcomes.map((outcome, index) => (
-              <Item
-                key={`${outcome.created_at}-${index}`}
-                meta={`${outcome.outcome_label} • ${formatDate(outcome.created_at)}`}
-              >
-                {outcome.text_snapshot}
-              </Item>
-            ))}
-          </Section>
-        </div>
-      )}
-    </main>
+    </>
   );
 }
