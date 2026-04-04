@@ -150,11 +150,13 @@ export async function POST(req: NextRequest) {
         try {
           const resend = new Resend(process.env.RESEND_API_KEY);
           const fromEmail = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+          const senderEmail = authData.user.email ?? undefined;
           await resend.emails.send({
             from: fromEmail,
             to: recipientEmail,
+            replyTo: senderEmail,
             subject: `${subject}`,
-            html: `<p>Hi ${recipientName},</p><p>This message was sent via Memori.</p><p>Regarding: ${subject}</p>`,
+            html: `<p>Hi ${recipientName},</p><p>${senderEmail ? `You can reply directly to ${senderEmail}.` : ""}</p><p>Regarding: ${subject}</p><p><br/><small>Sent via Memori</small></p>`,
           });
           // Log execution
           await supabase.from("pending_actions").update({
