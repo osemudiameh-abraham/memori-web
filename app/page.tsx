@@ -213,24 +213,30 @@ export default function Page() {
     let params: Record<string, string | null> = storedGel?.params ?? {};
     // Fallback: re-parse from message text if no stored params
     if (!storedGel) {
-      if (text.includes("email") || text.includes("Email")) {
+      const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
+      const subjectMatch = text.match(/"([^"]+)"/);
+      const recipient = recipientMatch?.[1] ?? null;
+      const subject = subjectMatch?.[1] ?? null;
+      if (text.toLowerCase().includes("whatsapp")) {
+        kind = "send_whatsapp";
+        params = { recipient, subject, time: null };
+      } else if (text.toLowerCase().includes("imessage") || text.toLowerCase().includes("text message")) {
+        kind = "send_imessage";
+        params = { recipient, subject, time: null };
+      } else if (text.toLowerCase().includes("email")) {
         kind = "send_email";
-        const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
-        const subjectMatch = text.match(/"([^"]+)"/);
-        params = { recipient: recipientMatch?.[1] ?? null, subject: subjectMatch?.[1] ?? null };
-      } else if (text.includes("reminder") || text.includes("Reminder")) {
+        params = { recipient, subject, time: null };
+      } else if (text.toLowerCase().includes("reminder")) {
         kind = "create_reminder";
         const timeMatch = text.match(/for (tomorrow|today|tonight|next \w+)/i);
-        const subjectMatch = text.match(/:\s*"([^"]+)"/);
-        params = { subject: subjectMatch?.[1] ?? "reminder", time: timeMatch?.[1] ?? null };
-      } else if (text.includes("meeting") || text.includes("Meeting")) {
+        params = { subject: subject ?? "reminder", time: timeMatch?.[1] ?? null, recipient: null };
+      } else if (text.toLowerCase().includes("meeting")) {
         kind = "schedule_meeting";
-        const recipientMatch = text.match(/with ([A-Z][a-z]+)/);
-        params = { recipient: recipientMatch?.[1] ?? null, time: null };
-      } else if (text.includes("draft") || text.includes("Draft")) {
+        const withMatch = text.match(/with ([A-Z][a-z]+)/);
+        params = { recipient: withMatch?.[1] ?? null, subject, time: null };
+      } else if (text.toLowerCase().includes("draft")) {
         kind = "draft_message";
-        const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
-        params = { recipient: recipientMatch?.[1] ?? null, subject: null };
+        params = { recipient, subject, time: null };
       }
     }
     // Clear stored params after use
