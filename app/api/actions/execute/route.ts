@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import OpenAI from "openai";
 
 export const runtime = "nodejs";
 
@@ -75,6 +76,48 @@ async function executeDraftMessage(
   return `Draft ready for ${recipient}:\n\nHi ${recipient},\n\nI wanted to follow up about ${subject}. Let me know if you have any questions or if there's anything else you need.\n\nBest,\nAbraham\n\nFeel free to edit before sending.`;
 }
 
+async function draftEmailWithLLM(opts: {
+  senderName: string | null;
+  senderRole: string | null;
+  senderCompany: string | null;
+  recipientName: string;
+  subject: string;
+  identityContext: Record<string, string>;
+}): Promise<string> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+  const identityLines = Object.entries(opts.identityContext)
+    .filter(([, v]) => v)
+    .map(([k, v]) => `- ${k}: ${v}`)
+    .join("\n");
+
+  const systemPrompt = `You are drafting a professional email on behalf of ${opts.senderName ?? "the user"}.
+Write a concise, genuine, professional email body.
+Do not include subject line. Do not include "Subject:" prefix.
+Start directly with the greeting.
+Keep it under 150 words.
+Sound human — not AI-generated.
+Use the sender's identity context to make it specific and relevant.
+
+Sender context:
+${identityLines || "No additional context."}`;
+
+  const userPrompt = `Draft a professional email to ${opts.recipientName} about: "${opts.subject}".
+The sender is ${opts.senderName ?? "the user"}${opts.senderRole ? `, ${opts.senderRole}` : ""}${opts.senderCompany ? ` at ${opts.senderCompany}` : ""}.`;
+
+  const resp = await openai.chat.completions.create({
+    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
+    temperature: 0.6,
+    max_tokens: 300,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  });
+
+  return resp.choices?.[0]?.message?.content?.trim() ?? `Hi ${opts.recipientName},\n\nI wanted to reach out about ${opts.subject}.\n\nBest,\n${opts.senderName ?? ""}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createSupabaseServerClient();
@@ -126,8 +169,30 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Fetch identity context for smarter draft
+        const { data: identityData } = await supabase
+          .from("memory_facts")
+          .select("fact_key, value_text")
+          .eq("user_id", authData.user.id)
+          .eq("status", "active")
+          .limit(10);
+
+        const identityContext: Record<string, string> = {};
+        for (const fact of identityData ?? []) {
+          identityContext[fact.fact_key] = fact.value_text;
+        }
+
+        // Draft the email body using LLM with full context
+        const bodyText = await draftEmailWithLLM({
+          senderName: identityContext["self_name"] ?? null,
+          senderRole: identityContext["self_role"] ?? null,
+          senderCompany: identityContext["self_company"] ?? null,
+          recipientName: recipientName,
+          subject,
+          identityContext,
+        });
+
         // Build Gmail compose URL — opens pre-filled in user's own Gmail
-        const bodyText = `Hi ${recipientName},\n\n`;
         const gmailUrl = recipientEmail
           ? `https://mail.google.com/mail/?view=cm&to=${encodeURIComponent(recipientEmail)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(bodyText)}`
           : null;
