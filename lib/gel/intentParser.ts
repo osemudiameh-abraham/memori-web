@@ -50,15 +50,15 @@ const SEARCH_PATTERNS = [
 ];
 
 function extractRecipient(text: string): string | null {
-  const patterns = [
-    /\bto\b\s+([A-Z][a-z]+)/,
-    /\b(email|message|send)\b\s+([A-Z][a-z]+)/i,
-    /\bwith\b\s+([A-Z][a-z]+)/,
-  ];
-  for (const p of patterns) {
-    const m = text.match(p);
-    if (m) return m[1] ?? m[2] ?? null;
-  }
+  // "to James" — most reliable
+  const toMatch = text.match(/\bto\b\s+([A-Z][a-z]+)/);
+  if (toMatch) return toMatch[1];
+  // "email James" or "send James" — capture word AFTER the verb
+  const verbMatch = text.match(/\b(?:email|message|send|tell|contact)\b\s+([A-Z][a-z]+)/i);
+  if (verbMatch) return verbMatch[1];
+  // "with James"
+  const withMatch = text.match(/\bwith\b\s+([A-Z][a-z]+)/);
+  if (withMatch) return withMatch[1];
   return null;
 }
 
