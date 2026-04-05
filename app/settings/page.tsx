@@ -163,7 +163,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#F5F4F0;color:#1C1A18;}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF9F5;color:#1C1A18;}`}</style>
       <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse 80% 60% at 50% -10%,rgba(255,255,255,0.98) 0%,transparent 60%),#F5F4F0" }}>
 
         {/* Topbar */}
@@ -209,7 +209,7 @@ export default function SettingsPage() {
                       <input type="text" value={prefs.timezone} onChange={e => setPrefs(p => ({ ...p, timezone: e.target.value }))} placeholder="Europe/London" style={{ ...inp, width:170 }}/>
                     </SettingRow>
                     <div style={{ marginTop:16, display:"flex", alignItems:"center", gap:12 }}>
-                      <button onClick={() => void savePrefs()} disabled={saving} style={{ padding:"9px 20px", borderRadius:10, border:"none", background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:500, cursor:"pointer", opacity:saving?0.6:1 }}>
+                      <button onClick={() => void savePrefs()} disabled={saving} style={{ padding:"9px 20px", borderRadius:10, border:"none", background:"#1C1A18", color:"#FAF9F5", fontFamily:"'DM Sans',sans-serif", fontSize:14, fontWeight:500, cursor:"pointer", opacity:saving?0.6:1 }}>
                         {saving ? "Saving…" : "Save preferences"}
                       </button>
                       {saveMsg && <span style={{ fontSize:13.5, color: saveMsg === "Saved." ? "#1A5C32" : "#6A1A1A" }}>{saveMsg}</span>}
@@ -264,7 +264,7 @@ export default function SettingsPage() {
                         <span style={{ fontSize:14, color:"#4A4845" }}>{email ?? "—"}</span>
                       </SettingRow>
                       <SettingRow label="Gmail" sub="Connect Gmail to send emails directly from your account">
-                        <a href="/api/auth/gmail" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:9, background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, textDecoration:"none" }}>
+                        <a href="/api/auth/gmail" style={{ display:"inline-flex", alignItems:"center", gap:6, padding:"7px 14px", borderRadius:9, background:"#1C1A18", color:"#FAF9F5", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, textDecoration:"none" }}>
                           Connect →
                         </a>
                       </SettingRow>

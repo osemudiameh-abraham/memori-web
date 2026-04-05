@@ -80,7 +80,7 @@ function TracePageInner() {
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#F5F4F0;color:#1C1A18;}`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF9F5;color:#1C1A18;}`}</style>
       <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse 80% 60% at 50% -10%,rgba(255,255,255,0.98) 0%,transparent 60%),#F5F4F0" }}>
 
         {/* Topbar */}
@@ -110,7 +110,7 @@ function TracePageInner() {
               <div style={{ fontSize:14.5, color:"#8A8785", lineHeight:1.60 }}>
                 Traces are opened from a chat response.<br/>Go back to the home page and start a conversation.
               </div>
-              <a href="/" style={{ display:"inline-flex", alignItems:"center", gap:6, marginTop:20, padding:"10px 20px", borderRadius:11, background:"#1C1A18", color:"#F5F4F0", fontSize:14, fontWeight:500, textDecoration:"none" }}>
+              <a href="/" style={{ display:"inline-flex", alignItems:"center", gap:6, marginTop:20, padding:"10px 20px", borderRadius:11, background:"#1C1A18", color:"#FAF9F5", fontSize:14, fontWeight:500, textDecoration:"none" }}>
                 Back to Memori
               </a>
             </div>
@@ -202,7 +202,7 @@ function TracePageInner() {
 export default function TracePage() {
   return (
     <Suspense fallback={
-      <div style={{ minHeight:"100vh", background:"#F5F4F0", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, color:"#8A8785", fontFamily:"'DM Sans',sans-serif" }}>
+      <div style={{ minHeight:"100vh", background:"#FAF9F5", display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, color:"#8A8785", fontFamily:"'DM Sans',sans-serif" }}>
         Loading trace…
       </div>
     }>
