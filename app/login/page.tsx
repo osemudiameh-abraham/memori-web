@@ -52,11 +52,12 @@ export default function LoginPage() {
   }
 
   const inp: React.CSSProperties = {
-    width:"100%", padding:"12px 14px", borderRadius:11,
-    border:"1.5px solid rgba(0,0,0,0.12)",
-    background:"rgba(255,255,255,0.85)",
+    width:"100%", padding:"11px 14px", borderRadius:10,
+    border:"1px solid rgba(0,0,0,0.18)",
+    background:"rgba(255,255,255,1)",
     fontFamily:"'DM Sans',sans-serif", fontSize:15, color:"#1C1A18",
-    outline:"none", transition:"border-color 150ms ease",
+    outline:"none", transition:"border-color 150ms ease, box-shadow 150ms ease",
+    boxShadow:"0 1px 2px rgba(0,0,0,0.04)",
   };
 
   const TRUST = [
@@ -69,49 +70,323 @@ export default function LoginPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html,body{min-height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#F5F4F0;color:#1C1A18;}
-        input:focus{border-color:rgba(0,0,0,0.28)!important;box-shadow:0 0 0 3px rgba(0,0,0,0.06)!important;}
-        input::placeholder{color:#B0ADA8;}
-        .root{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;background:radial-gradient(ellipse 80% 60% at 50% -10%,rgba(255,255,255,0.98) 0%,transparent 60%),#F5F4F0;}
-        @media(max-width:700px){.root{grid-template-columns:1fr;}.trust-panel{display:none!important;}}
-        .form-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 32px;min-height:100vh;}
-        .trust-panel{display:flex;flex-direction:column;justify-content:center;padding:60px 48px;background:rgba(255,255,255,0.55);border-left:1px solid rgba(0,0,0,0.07);}
-        .card{width:100%;max-width:400px;}
-        .logo-row{display:flex;align-items:center;gap:12px;margin-bottom:32px;}
-        .logo{width:44px;height:44px;flex-shrink:0;}
-        .brand{font-family:'Lora',Georgia,serif;font-size:22px;font-weight:500;color:#2A2825;letter-spacing:-0.2px;}
-        .heading{font-family:'Lora',Georgia,serif;font-size:26px;font-weight:400;color:#2A2825;letter-spacing:-0.3px;margin-bottom:6px;}
-        .sub{font-size:14.5px;color:#8A8785;line-height:1.55;margin-bottom:28px;}
-        .google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px;border-radius:11px;border:1.5px solid rgba(0,0,0,0.14);background:rgba(255,255,255,0.90);font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:500;color:#1C1A18;cursor:pointer;transition:all 140ms ease;margin-bottom:16px;}
-        .google-btn:hover{background:rgba(255,255,255,1);border-color:rgba(0,0,0,0.22);box-shadow:0 2px 8px rgba(0,0,0,0.07);}
-        .google-btn:disabled{opacity:0.6;cursor:not-allowed;}
-        .divider{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
-        .divider-line{flex:1;height:1px;background:rgba(0,0,0,0.09);}
-        .divider-text{font-size:12.5px;color:#ABABAB;}
-        .field-label{font-size:13px;font-weight:500;color:#4A4845;margin-bottom:6px;}
-        .field-wrap{position:relative;margin-bottom:12px;}
-        .pass-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8A8785;font-size:12px;font-family:'DM Sans',sans-serif;padding:4px;}
+        html,body{min-height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF9F5;color:#1C1A18;}
+
+        /* ── Root layout ── */
+        .root{
+          min-height:100vh;
+          display:grid;
+          grid-template-columns:1fr 1fr;
+          background:#FAF9F5;
+        }
+        @media(max-width:720px){
+          .root{grid-template-columns:1fr;}
+          .trust-panel{display:none!important;}
+        }
+
+        /* ── Form panel (left) ── */
+        .form-panel{
+          display:flex;
+          flex-direction:column;
+          align-items:center;
+          justify-content:center;
+          padding:48px 40px;
+          min-height:100vh;
+        }
+        @media(max-width:720px){
+          .form-panel{padding:40px 24px;}
+        }
+
+        /* ── Card ── */
+        .card{
+          width:100%;
+          max-width:380px;
+        }
+
+        /* ── Logo row ── */
+        .logo-row{
+          display:flex;
+          align-items:center;
+          gap:11px;
+          margin-bottom:40px;
+        }
+        .logo{width:36px;height:36px;flex-shrink:0;}
+        .brand{
+          font-family:'Lora',Georgia,serif;
+          font-size:20px;
+          font-weight:500;
+          color:#1C1A18;
+          letter-spacing:-0.2px;
+        }
+
+        /* ── Headings ── */
+        .heading{
+          font-family:'Lora',Georgia,serif;
+          font-size:24px;
+          font-weight:400;
+          color:#1C1A18;
+          letter-spacing:-0.3px;
+          margin-bottom:6px;
+          line-height:1.25;
+        }
+        .sub{
+          font-size:14px;
+          color:#8A8785;
+          line-height:1.55;
+          margin-bottom:28px;
+        }
+
+        /* ── Google button ── */
+        .google-btn{
+          width:100%;
+          display:flex;
+          align-items:center;
+          justify-content:center;
+          gap:10px;
+          padding:12px 16px;
+          border-radius:12px;
+          border:1px solid rgba(0,0,0,0.12);
+          background:#FFFFFF;
+          font-family:'DM Sans',sans-serif;
+          font-size:14.5px;
+          font-weight:500;
+          color:#1C1A18;
+          cursor:pointer;
+          transition:all 150ms ease;
+          margin-bottom:16px;
+          box-shadow:0 1px 3px rgba(0,0,0,0.05);
+          letter-spacing:-0.1px;
+        }
+        .google-btn:hover{
+          border-color:rgba(0,0,0,0.2);
+          box-shadow:0 2px 8px rgba(0,0,0,0.08);
+          transform:translateY(-1px);
+        }
+        .google-btn:active{transform:translateY(0);}
+        .google-btn:disabled{opacity:0.55;cursor:not-allowed;transform:none;}
+
+        /* ── Divider ── */
+        .divider{
+          display:flex;
+          align-items:center;
+          gap:12px;
+          margin-bottom:18px;
+        }
+        .divider-line{flex:1;height:1px;background:rgba(0,0,0,0.08);}
+        .divider-text{font-size:12px;color:#C0BDB8;font-weight:500;letter-spacing:0.3px;}
+
+        /* ── Form fields ── */
+        .field-label{
+          font-size:13px;
+          font-weight:500;
+          color:#4A4845;
+          margin-bottom:5px;
+          display:block;
+        }
+        .field-wrap{
+          position:relative;
+          margin-bottom:12px;
+        }
+        input[type="email"],
+        input[type="password"],
+        input[type="text"]{
+          width:100%;
+          padding:11px 14px;
+          border-radius:10px;
+          border:1px solid rgba(0,0,0,0.12);
+          background:#FFFFFF;
+          font-family:'DM Sans',sans-serif;
+          font-size:14.5px;
+          color:#1C1A18;
+          transition:border-color 150ms ease,box-shadow 150ms ease;
+          outline:none;
+          -webkit-appearance:none;
+        }
+        input[type="email"]:focus,
+        input[type="password"]:focus,
+        input[type="text"]:focus{
+          border-color:rgba(0,0,0,0.3);
+          box-shadow:0 0 0 3px rgba(0,0,0,0.05);
+        }
+        input::placeholder{color:#C0BDB8;}
+
+        .pass-toggle{
+          position:absolute;right:12px;top:50%;
+          transform:translateY(-50%);
+          background:none;border:none;
+          cursor:pointer;color:#8A8785;
+          font-size:12px;
+          font-family:'DM Sans',sans-serif;
+          padding:4px;
+          transition:color 130ms ease;
+        }
         .pass-toggle:hover{color:#1C1A18;}
-        .primary-btn{width:100%;padding:13px;border-radius:11px;border:none;background:#1C1A18;color:#F5F4F0;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all 140ms ease;margin-top:4px;}
-        .primary-btn:hover:not(:disabled){background:#3A3835;}
-        .primary-btn:disabled{opacity:0.6;cursor:not-allowed;}
-        .magic-link-btn{width:100%;padding:10px;border-radius:11px;border:1px solid rgba(0,0,0,0.12);background:transparent;color:#4A4845;font-family:'DM Sans',sans-serif;font-size:13.5px;cursor:pointer;transition:all 130ms ease;margin-top:8px;}
-        .magic-link-btn:hover{background:rgba(0,0,0,0.04);}
-        .error-box{padding:10px 13px;border-radius:10px;background:rgba(255,240,240,0.95);border:1px solid rgba(185,60,60,0.18);color:#6A1A1A;font-size:13.5px;margin-bottom:12px;}
-        .mode-switch{text-align:center;margin-top:20px;font-size:13.5px;color:#8A8785;}
-        .mode-link{color:#1C1A18;font-weight:500;cursor:pointer;text-decoration:underline;text-underline-offset:2px;background:none;border:none;font-family:inherit;font-size:inherit;}
-        .trust-heading{font-family:'Lora',Georgia,serif;font-size:20px;font-weight:500;color:#2A2825;letter-spacing:-0.2px;margin-bottom:6px;}
-        .trust-sub{font-size:14px;color:#8A8785;line-height:1.55;margin-bottom:32px;}
-        .trust-item{display:flex;gap:14px;align-items:flex-start;margin-bottom:22px;}
-        .trust-icon{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,0.80);border:1px solid rgba(0,0,0,0.08);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
-        .trust-label{font-size:14px;font-weight:500;color:#1C1A18;margin-bottom:2px;}
-        .trust-desc{font-size:13px;color:#8A8785;line-height:1.50;}
+
+        /* ── Primary button ── */
+        .primary-btn{
+          width:100%;
+          padding:12px 16px;
+          border-radius:12px;
+          border:none;
+          background:#1C1A18;
+          color:#FAFAF8;
+          font-family:'DM Sans',sans-serif;
+          font-size:15px;
+          font-weight:500;
+          cursor:pointer;
+          transition:all 150ms ease;
+          margin-top:4px;
+          letter-spacing:-0.1px;
+        }
+        .primary-btn:hover:not(:disabled){
+          background:#2E2C2A;
+          transform:translateY(-1px);
+          box-shadow:0 4px 12px rgba(0,0,0,0.18);
+        }
+        .primary-btn:active{transform:translateY(0);}
+        .primary-btn:disabled{opacity:0.55;cursor:not-allowed;transform:none;}
+
+        /* ── Magic link button ── */
+        .magic-link-btn{
+          width:100%;
+          padding:11px 16px;
+          border-radius:12px;
+          border:1px solid rgba(0,0,0,0.10);
+          background:transparent;
+          color:#4A4845;
+          font-family:'DM Sans',sans-serif;
+          font-size:14px;
+          cursor:pointer;
+          transition:all 130ms ease;
+          margin-top:8px;
+        }
+        .magic-link-btn:hover{
+          background:#FFFFFF;
+          border-color:rgba(0,0,0,0.16);
+        }
+
+        /* ── Error box ── */
+        .error-box{
+          padding:10px 14px;
+          border-radius:10px;
+          background:rgba(255,240,240,0.95);
+          border:1px solid rgba(185,60,60,0.15);
+          color:#8B2020;
+          font-size:13.5px;
+          margin-bottom:12px;
+          line-height:1.5;
+        }
+
+        /* ── Mode switch ── */
+        .mode-switch{
+          text-align:center;
+          margin-top:22px;
+          font-size:13.5px;
+          color:#8A8785;
+        }
+        .mode-link{
+          color:#1C1A18;
+          font-weight:600;
+          cursor:pointer;
+          text-decoration:none;
+          background:none;
+          border:none;
+          font-family:inherit;
+          font-size:inherit;
+          border-bottom:1px solid rgba(0,0,0,0.2);
+          padding-bottom:1px;
+          transition:border-color 130ms ease;
+        }
+        .mode-link:hover{border-color:rgba(0,0,0,0.6);}
+
+        /* ── Sent confirmation ── */
         .sent-box{text-align:center;padding:8px 0;}
-        .sent-icon{font-size:40px;margin-bottom:16px;}
-        .back-home{display:block;text-align:center;margin-top:16px;font-size:13.5px;color:#8A8785;text-decoration:none;transition:color 130ms ease;}
+        .sent-icon{font-size:36px;margin-bottom:14px;}
+        .back-home{
+          display:block;
+          text-align:center;
+          margin-top:16px;
+          font-size:13.5px;
+          color:#8A8785;
+          text-decoration:none;
+          transition:color 130ms ease;
+        }
         .back-home:hover{color:#1C1A18;}
+
+        /* ── Trust panel (right) ── */
+        .trust-panel{
+          display:flex;
+          flex-direction:column;
+          justify-content:center;
+          padding:60px 56px;
+          background:#FFFFFF;
+          border-left:1px solid rgba(0,0,0,0.07);
+          min-height:100vh;
+        }
+        .trust-heading{
+          font-family:'Lora',Georgia,serif;
+          font-size:21px;
+          font-weight:500;
+          color:#1C1A18;
+          letter-spacing:-0.3px;
+          margin-bottom:6px;
+          line-height:1.3;
+        }
+        .trust-sub{
+          font-size:14px;
+          color:#8A8785;
+          line-height:1.6;
+          margin-bottom:36px;
+          max-width:340px;
+        }
+        .trust-item{
+          display:flex;
+          gap:16px;
+          align-items:flex-start;
+          margin-bottom:24px;
+          padding-bottom:24px;
+          border-bottom:1px solid rgba(0,0,0,0.06);
+        }
+        .trust-item:last-of-type{border-bottom:none;margin-bottom:0;padding-bottom:0;}
+        .trust-icon{
+          width:38px;height:38px;
+          border-radius:10px;
+          background:#FAF9F5;
+          border:1px solid rgba(0,0,0,0.07);
+          display:flex;align-items:center;justify-content:center;
+          font-size:17px;flex-shrink:0;
+        }
+        .trust-label{
+          font-size:14px;font-weight:600;
+          color:#1C1A18;margin-bottom:3px;
+          letter-spacing:-0.1px;
+        }
+        .trust-desc{
+          font-size:13px;color:#8A8785;line-height:1.55;
+        }
+
+        /* ── What Memori remembers box ── */
+        .memory-box{
+          margin-top:36px;
+          padding:18px 20px;
+          border-radius:14px;
+          background:#FAF9F5;
+          border:1px solid rgba(0,0,0,0.07);
+        }
+        .memory-box-label{
+          font-size:11px;font-weight:600;letter-spacing:0.8px;
+          color:#B0ADA8;text-transform:uppercase;margin-bottom:8px;
+        }
+        .memory-box-text{
+          font-size:13.5px;color:#4A4845;line-height:1.65;
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+        .card{animation:fadeUp 0.4s cubic-bezier(0.16,1,0.3,1) both;}
+        .trust-panel>*{animation:fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both;}
       `}</style>
 
       <div className="root">
