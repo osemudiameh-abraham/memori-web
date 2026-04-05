@@ -23,9 +23,15 @@ export default function LoginPage() {
       if (error) { setErrorMsg(error.message); setStatus("error"); return; }
       setMode("sent");
     } else {
-      const { error } = await supabase.auth.signInWithPassword({ email: t, password });
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: t, password });
       if (error) { setErrorMsg(error.message); setStatus("error"); return; }
-      window.location.href = "/";
+      // Check if new user needs onboarding
+      if (signInData?.user) {
+        const { data: profile } = await supabase.from("identity_profiles").select("id").eq("user_id", signInData.user.id).maybeSingle();
+        window.location.href = profile ? "/" : "/onboarding";
+      } else {
+        window.location.href = "/";
+      }
     }
     setStatus("idle");
   }
