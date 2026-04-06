@@ -63,7 +63,7 @@ export default function Page() {
   const [bannerHidden, setBannerHidden] = useState(true);
   const [reviewNowBusy, setReviewNowBusy] = useState(false);
   const [reminder, setReminder] = useState<string | null>(null);
-  const [approving, setApproving] = useState<string | null>(null); // tracks which message is being approved
+  const [approving, setApproving] = useState<string | null>(null);
   const [gelParams, setGelParams] = useState<{ kind: string; params: Record<string, string | null> } | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -195,62 +195,37 @@ export default function Page() {
     onError: (msg) => { setVoiceError(msg); },
   });
 
-
   async function handleApprove(messageIndex: number, approved: boolean) {
     if (approving) return;
     setApproving(String(messageIndex));
-    // Mark message as approved/cancelled immediately
     setMessages(prev => {
       const updated = [...prev];
       updated[messageIndex] = { ...updated[messageIndex], approved: approved ? "yes" : "no" };
       return updated;
     });
-    // Use stored GEL params from detection time if available
     const storedGel = gelParams;
     const msg = messages[messageIndex];
     const text = msg?.text ?? "";
     let kind = storedGel?.kind ?? "none";
     let params: Record<string, string | null> = storedGel?.params ?? {};
-    // Fallback: re-parse from message text if no stored params
     if (!storedGel) {
       const recipientMatch = text.match(/to ([A-Z][a-z]+)/);
       const subjectMatch = text.match(/"([^"]+)"/);
       const recipient = recipientMatch?.[1] ?? null;
       const subject = subjectMatch?.[1] ?? null;
-      if (text.toLowerCase().includes("whatsapp")) {
-        kind = "send_whatsapp";
-        params = { recipient, subject, time: null };
-      } else if (text.toLowerCase().includes("imessage") || text.toLowerCase().includes("text message")) {
-        kind = "send_imessage";
-        params = { recipient, subject, time: null };
-      } else if (text.toLowerCase().includes("email")) {
-        kind = "send_email";
-        params = { recipient, subject, time: null };
-      } else if (text.toLowerCase().includes("reminder")) {
-        kind = "create_reminder";
-        const timeMatch = text.match(/for (tomorrow|today|tonight|next \w+)/i);
-        params = { subject: subject ?? "reminder", time: timeMatch?.[1] ?? null, recipient: null };
-      } else if (text.toLowerCase().includes("meeting")) {
-        kind = "schedule_meeting";
-        const withMatch = text.match(/with ([A-Z][a-z]+)/);
-        params = { recipient: withMatch?.[1] ?? null, subject, time: null };
-      } else if (text.toLowerCase().includes("draft")) {
-        kind = "draft_message";
-        params = { recipient, subject, time: null };
-      }
+      if (text.toLowerCase().includes("whatsapp")) { kind = "send_whatsapp"; params = { recipient, subject, time: null }; }
+      else if (text.toLowerCase().includes("imessage") || text.toLowerCase().includes("text message")) { kind = "send_imessage"; params = { recipient, subject, time: null }; }
+      else if (text.toLowerCase().includes("email")) { kind = "send_email"; params = { recipient, subject, time: null }; }
+      else if (text.toLowerCase().includes("reminder")) { const timeMatch = text.match(/for (tomorrow|today|tonight|next \w+)/i); kind = "create_reminder"; params = { subject: subject ?? "reminder", time: timeMatch?.[1] ?? null, recipient: null }; }
+      else if (text.toLowerCase().includes("meeting")) { const withMatch = text.match(/with ([A-Z][a-z]+)/); kind = "schedule_meeting"; params = { recipient: withMatch?.[1] ?? null, subject, time: null }; }
+      else if (text.toLowerCase().includes("draft")) { kind = "draft_message"; params = { recipient, subject, time: null }; }
     }
-    // Clear stored params after use
     setGelParams(null);
     try {
-      const res = await fetch("/api/actions/execute", {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, params, approved }),
-      });
+      const res = await fetch("/api/actions/execute", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, params, approved }) });
       const data = await res.json() as { ok: boolean; message?: string };
       if (data.ok && data.message) {
         const msg = data.message;
-        // Detect Gmail compose signal
         if (msg.startsWith("__GMAIL_COMPOSE__")) {
           const gmailUrl = msg.match(/__GMAIL_COMPOSE__(.*?)__RECIPIENT__/)?.[1] ?? "";
           const recipientName = msg.match(/__RECIPIENT__(.*?)__SUBJECT__/)?.[1] ?? "them";
@@ -263,63 +238,33 @@ export default function Page() {
           const kind = msg.match(/__KIND__(.*?)$/)?.[1] ?? "message";
           window.open(composeUrl, "_blank");
           setMessages(prev => [...prev, { role: "assistant", text: `__MSG_SENT__${recipientName}__${kind}` }]);
-        } else {
-          setMessages(prev => [...prev, { role: "assistant", text: msg }]);
-        }
+        } else { setMessages(prev => [...prev, { role: "assistant", text: msg }]); }
       }
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", text: approved ? "Action noted. I'll follow up shortly." : "Understood — action cancelled." }]);
-    }
+    } catch { setMessages(prev => [...prev, { role: "assistant", text: approved ? "Action noted. I will follow up shortly." : "Understood, action cancelled." }]); }
     setApproving(null);
   }
 
-  function handleMicClick() {
-    setVoiceError(null);
-    if (voiceActive) stopVoice(); else startVoice();
-  }
+  function handleMicClick() { setVoiceError(null); if (voiceActive) stopVoice(); else startVoice(); }
 
-  async function signOut() {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    window.location.reload();
-  }
+  async function signOut() { const supabase = createSupabaseBrowserClient(); await supabase.auth.signOut(); window.location.reload(); }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(input); }
-  }
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendMessage(input); } }
 
-  function autoResize(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setInput(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
-  }
+  function autoResize(e: React.ChangeEvent<HTMLTextAreaElement>) { setInput(e.target.value); e.target.style.height = "auto"; e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px"; }
 
   const isBusy = status === "thinking";
   const hasMessages = messages.length > 0;
   const userInitial = email ? email.charAt(0).toUpperCase() : "?";
   const greetingPhrase = getGreetingPhrase(selfName);
+  const hasText = input.trim().length > 0;
 
   const MemoriIcon = ({ size = 42, spinning = false }: { size?: number; spinning?: boolean }) => (
-    <img
-      src="/memori-icon.png"
-      alt="Memori"
-      style={{
-        width: size,
-        height: size,
-        objectFit: "contain",
-        animation: spinning ? "mspin 1.2s linear infinite" : "none",
-        flexShrink: 0,
-      }}
-    />
+    <img src="/memori-icon.png" alt="Memori" style={{ width: size, height: size, objectFit: "contain", animation: spinning ? "mspin 1.2s linear infinite" : "none", flexShrink: 0 }}/>
   );
 
   const WaveformIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-      <line x1="4" y1="12" x2="4" y2="12"/>
-      <line x1="8" y1="8" x2="8" y2="16"/>
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="16" y1="8" x2="16" y2="16"/>
-      <line x1="20" y1="12" x2="20" y2="12"/>
+      <line x1="4" y1="12" x2="4" y2="12"/><line x1="8" y1="8" x2="8" y2="16"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="16" y1="8" x2="16" y2="16"/><line x1="20" y1="12" x2="20" y2="12"/>
     </svg>
   );
 
@@ -333,490 +278,140 @@ export default function Page() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
-
         *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
         html,body{height:100%;}
-        body{
-          font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
-          -webkit-font-smoothing:antialiased;
-          overflow:hidden;
-          background:#FAF9F5;
-          color:#1C1A18;
-        }
+        body{font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden;background:#FAF9F5;color:#1C1A18;}
 
-        /* ── App shell ── */
-        .app{
-          height:100vh;
-          display:flex;
-          overflow:hidden;
-          background:#FAF9F5;
-        }
+        .app{height:100vh;display:flex;overflow:hidden;background:#FAF9F5;}
 
-        /* ── Sidebar ── */
-        .sidebar{
-          width:48px;
-          min-width:48px;
-          height:100vh;
-          display:flex;
-          flex-direction:column;
-          align-items:center;
-          padding:8px 0 14px;
-          background:transparent;
-          border-right:1px solid rgba(0,0,0,0.06);
-          z-index:20;
-          flex-shrink:0;
-        }
-        .sidebar.expanded{
-          width:220px;
-          align-items:flex-start;
-          padding:8px 8px 14px;
-        }
-
-        .sb-btn{
-          width:32px;height:32px;
-          border-radius:8px;
-          border:none;background:transparent;
-          cursor:pointer;
-          display:flex;align-items:center;justify-content:center;
-          color:#6B6865;
-          text-decoration:none;
-          transition:background 130ms ease,color 130ms ease;
-          flex-shrink:0;
-          position:relative;
-        }
+        .sidebar{width:48px;min-width:48px;height:100vh;display:flex;flex-direction:column;align-items:center;padding:8px 0 14px;background:transparent;border-right:1px solid rgba(0,0,0,0.06);z-index:20;flex-shrink:0;}
+        .sb-btn{width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#6B6865;text-decoration:none;transition:background 130ms ease,color 130ms ease;flex-shrink:0;position:relative;}
         .sb-btn:hover{background:rgba(0,0,0,0.07);color:#1C1A18;}
-
-        .sb-btn::after{
-          content:attr(data-tip);
-          position:absolute;
-          left:calc(100% + 10px);
-          top:50%;transform:translateY(-50%);
-          background:#1C1A18;color:#F5F4F0;
-          font-family:'DM Sans',sans-serif;
-          font-size:12px;padding:5px 9px;
-          border-radius:7px;white-space:nowrap;
-          pointer-events:none;opacity:0;
-          transition:opacity 100ms ease;z-index:99;
-        }
-        .sidebar:not(.expanded) .sb-btn:hover::after{opacity:1;}
-
-        .sb-new{
-          width:32px;height:32px;
-          border-radius:16px;
-          border:1px solid rgba(0,0,0,0.14);
-          background:rgba(255,255,255,0.70);
-          cursor:pointer;
-          display:flex;align-items:center;justify-content:center;
-          color:#3C3A38;
-          transition:all 130ms ease;
-          flex-shrink:0;
-        }
+        .sb-btn::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);top:50%;transform:translateY(-50%);background:#1C1A18;color:#F5F4F0;font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 100ms ease;z-index:99;}
+        .sb-btn:hover::after{opacity:1;}
+        .sb-new{width:32px;height:32px;border-radius:16px;border:1px solid rgba(0,0,0,0.14);background:rgba(255,255,255,0.70);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#3C3A38;transition:all 130ms ease;flex-shrink:0;}
         .sb-new:hover{background:rgba(255,255,255,1);border-color:rgba(0,0,0,0.22);}
-
         .sb-divider{width:24px;height:1px;background:rgba(0,0,0,0.09);margin:4px 0 3px;flex-shrink:0;}
-        .sidebar.expanded .sb-divider{width:100%;}
-
         .sb-spacer{flex:1;}
-
-        .sb-avatar{
-          width:30px;height:30px;
-          border-radius:50%;
-          background:#1C1A18;color:#F5F4F0;
-          display:flex;align-items:center;justify-content:center;
-          font-size:12px;font-weight:600;
-          cursor:pointer;border:none;
-          font-family:'DM Sans',sans-serif;
-          transition:opacity 130ms ease;
-          flex-shrink:0;
-        }
+        .sb-avatar{width:30px;height:30px;border-radius:50%;background:#1C1A18;color:#F5F4F0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:opacity 130ms ease;flex-shrink:0;}
         .sb-avatar:hover{opacity:0.80;}
-        .sb-avatar::after{
-          content:attr(data-tip);
-          position:absolute;
-          left:calc(100% + 10px);bottom:0;
-          background:#1C1A18;color:#F5F4F0;
-          font-family:'DM Sans',sans-serif;
-          font-size:12px;padding:5px 9px;
-          border-radius:7px;white-space:nowrap;
-          pointer-events:none;opacity:0;
-          transition:opacity 100ms ease;z-index:99;
-        }
+        .sb-avatar::after{content:attr(data-tip);position:absolute;left:calc(100% + 10px);bottom:0;background:#1C1A18;color:#F5F4F0;font-family:'DM Sans',sans-serif;font-size:12px;padding:5px 9px;border-radius:7px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity 100ms ease;z-index:99;}
         .sb-avatar:hover::after{opacity:1;}
 
-        /* ── Main ── */
         .main{flex:1;display:flex;flex-direction:column;min-width:0;height:100vh;overflow:hidden;}
 
-        /* ── Empty state ── */
-        .empty{
-          flex:1;display:flex;flex-direction:column;
-          align-items:center;justify-content:center;
-          padding:0 32px 60px;
-          min-height:0;
-        }
+        .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 60px;min-height:0;}
+        .greeting-row{display:flex;align-items:center;gap:14px;margin-bottom:32px;animation:gfade 0.5s ease both;}
+        .greeting-text{font-family:'Lora',Georgia,serif;font-size:clamp(28px,3.5vw,44px);font-weight:400;color:#2A2825;letter-spacing:-0.5px;line-height:1.15;white-space:nowrap;}
 
-        .greeting-row{
-          display:flex;align-items:center;gap:14px;
-          margin-bottom:32px;
-          animation:gfade 0.5s ease both;
-        }
-        .greeting-text{
-          font-family:'Lora',Georgia,serif;
-          font-size:clamp(28px,3.5vw,44px);
-          font-weight:400;
-          color:#2A2825;
-          letter-spacing:-0.5px;
-          line-height:1.15;
-          white-space:nowrap;
-        }
+        .input-card{width:100%;max-width:672px;background:#FFFFFF;border-radius:20px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 1px 12px rgba(0,0,0,0.05),0 1px 2px rgba(0,0,0,0.03);padding:16px 18px 14px;display:flex;flex-direction:column;transition:box-shadow 200ms ease,border-color 300ms ease;position:relative;isolation:isolate;}
+        .input-card:focus-within{border-color:rgba(0,0,0,0.14);box-shadow:0 4px 24px rgba(0,0,0,0.10),0 1px 3px rgba(0,0,0,0.05);}
 
-        /* ── Input card ── */
-        .input-card{
-          width:100%;max-width:672px;
-          background:#FFFFFF;
-          border-radius:20px;
-          border:1px solid rgba(0,0,0,0.08);
-          box-shadow:0 1px 12px rgba(0,0,0,0.05),0 1px 2px rgba(0,0,0,0.03);
-          padding:16px 18px 14px;
-          display:flex;
-          flex-direction:column;
-          transition:box-shadow 200ms ease,border-color 200ms ease;
-        }
-        .input-card:focus-within{
-          box-shadow:0 2px 20px rgba(0,0,0,0.08),0 1px 3px rgba(0,0,0,0.04);
-          border-color:rgba(0,0,0,0.12);
-        }
-        .input-card:focus-within{
-          border-color:rgba(0,0,0,0.14);
-          box-shadow:0 4px 24px rgba(0,0,0,0.10),0 1px 3px rgba(0,0,0,0.05);
-        }
+        .input-card::before{content:'';position:absolute;inset:-1px;border-radius:21px;padding:1px;background:linear-gradient(90deg,rgba(0,0,0,0.08) 0%,rgba(91,168,216,0.15) 30%,rgba(91,168,216,0.55) 48%,rgba(91,168,216,0.7) 50%,rgba(91,168,216,0.55) 52%,rgba(91,168,216,0.15) 70%,rgba(0,0,0,0.08) 100%);background-size:250% 100%;-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity 350ms ease;pointer-events:none;z-index:-1;}
+        .input-card.has-text{border-color:transparent;}
+        .input-card.has-text::before{opacity:1;animation:shimmer 2s ease-in-out infinite;}
 
-        .input-card textarea{
-          width:100%;background:transparent;border:none;outline:none;
-          font-family:'DM Sans',-apple-system,sans-serif;
-          font-size:16px;color:#1C1A18;
-          resize:none;line-height:1.58;
-          min-height:28px;max-height:160px;
-          display:block;
-        }
+        .input-card textarea{width:100%;background:transparent;border:none;outline:none;font-family:'DM Sans',-apple-system,sans-serif;font-size:16px;color:#1C1A18;resize:none;line-height:1.58;min-height:28px;max-height:160px;display:block;}
         .input-card textarea::placeholder{color:#B0ADA8;font-weight:300;}
-
-        .card-actions{
-          display:flex;align-items:center;
-          justify-content:space-between;
-          padding-top:12px;
-          margin-top:8px;
-        }
-
+        .card-actions{display:flex;align-items:center;justify-content:space-between;padding-top:12px;margin-top:8px;}
         .card-left{display:flex;align-items:center;gap:4px;}
         .card-right{display:flex;align-items:center;gap:8px;}
+        .card-context{font-size:13px;font-weight:400;color:#9A9690;display:flex;align-items:center;gap:5px;cursor:default;user-select:none;}
 
-        .card-context{
-          font-size:13px;font-weight:400;
-          color:#9A9690;
-          display:flex;align-items:center;gap:5px;
-          cursor:default;user-select:none;
-        }
-
-        /* ── Chips ── */
-        .chips{
-          display:flex;
-          flex-wrap:nowrap;
-          gap:8px;
-          margin-top:14px;
-          justify-content:center;
-          overflow-x:auto;
-          padding-bottom:4px;
-          scrollbar-width:none;
-          -ms-overflow-style:none;
-        }
+        .chips{display:flex;flex-wrap:nowrap;gap:8px;margin-top:14px;justify-content:center;overflow-x:auto;padding-bottom:4px;scrollbar-width:none;-ms-overflow-style:none;}
         .chips::-webkit-scrollbar{display:none;}
-
-        .chip{
-          display:inline-flex;align-items:center;gap:6px;
-          padding:0 10px;
-          height:32px;
-          background:rgb(250,249,245);
-          border:0.5px solid rgba(31,30,29,0.15);
-          border-radius:8px;
-          font-size:14px;font-weight:400;
-          color:rgb(61,61,58);
-          cursor:pointer;font-family:'DM Sans',sans-serif;
-          transition:all 120ms ease;
-          white-space:nowrap;
-        }
+        .chip{display:inline-flex;align-items:center;gap:6px;padding:0 10px;height:32px;background:rgb(250,249,245);border:0.5px solid rgba(31,30,29,0.15);border-radius:8px;font-size:14px;font-weight:400;color:rgb(61,61,58);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 120ms ease;white-space:nowrap;}
         .chip svg{opacity:0.60;flex-shrink:0;}
-        .chip:hover{
-          background:rgba(240,238,232,1);
-          border-color:rgba(31,30,29,0.22);
-          color:#1C1A18;
-        }
+        .chip:hover{background:rgba(240,238,232,1);border-color:rgba(31,30,29,0.22);color:#1C1A18;}
         .chip:hover svg{opacity:0.9;}
 
-        /* ── Messages ── */
-        .messages{
-          flex:1;overflow-y:auto;
-          padding:28px 0 16px;
-          display:flex;flex-direction:column;gap:20px;
-          min-height:0;
-          width:100%;max-width:680px;
-          margin:0 auto;align-self:stretch;
-          scroll-behavior:smooth;
-        }
+        .messages{flex:1;overflow-y:auto;padding:28px 0 16px;display:flex;flex-direction:column;gap:20px;min-height:0;width:100%;max-width:680px;margin:0 auto;align-self:stretch;scroll-behavior:smooth;}
         .messages::-webkit-scrollbar{width:3px;}
         .messages::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.10);border-radius:2px;}
-
         .msg-row{display:flex;}
         .msg-row.user{justify-content:flex-end;}
         .msg-row.assistant{justify-content:flex-start;gap:10px;align-items:flex-start;}
-
-        .assistant-icon{
-          width:26px;height:26px;
-          flex-shrink:0;margin-top:4px;
-        }
-
-        .bubble{
-          max-width:80%;
-          padding:12px 16px;
-          font-size:15px;line-height:1.65;
-          white-space:pre-wrap;word-break:break-word;
-          animation:mmsg 0.22s cubic-bezier(0.16,1,0.3,1) both;
-          border-radius:18px;
-        }
-        .bubble.user{
-          background:#1C1A18;color:#F5F4F0;
-          border-radius:18px 4px 18px 18px;
-        }
-        .bubble.assistant{
-          background:rgba(255,255,255,0.90);color:#1C1A18;
-          border-radius:4px 18px 18px 18px;
-          border:1px solid rgba(0,0,0,0.08);
-          box-shadow:0 1px 4px rgba(0,0,0,0.05);
-        }
-
-        .typing-bubble{
-          background:rgba(255,255,255,0.90);
-          border:1px solid rgba(0,0,0,0.08);
-          border-radius:4px 18px 18px 18px;
-          padding:12px 16px;
-          display:flex;gap:4px;align-items:center;
-          box-shadow:0 1px 4px rgba(0,0,0,0.05);
-        }
+        .assistant-icon{width:26px;height:26px;flex-shrink:0;margin-top:4px;}
+        .bubble{max-width:80%;padding:12px 16px;font-size:15px;line-height:1.65;white-space:pre-wrap;word-break:break-word;animation:mmsg 0.3s cubic-bezier(0.16,1,0.3,1) both;border-radius:18px;}
+        .bubble.user{background:#1C1A18;color:#F5F4F0;border-radius:18px 4px 18px 18px;}
+        .bubble.assistant{background:rgba(255,255,255,0.90);color:#1C1A18;border-radius:4px 18px 18px 18px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+        .typing-bubble{background:rgba(255,255,255,0.90);border:1px solid rgba(0,0,0,0.08);border-radius:4px 18px 18px 18px;padding:12px 16px;display:flex;gap:4px;align-items:center;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
         .dot{width:5px;height:5px;border-radius:50%;background:#ABABAB;animation:mdot 1.3s ease-in-out infinite;}
         .dot:nth-child(2){animation-delay:0.15s;}
         .dot:nth-child(3){animation-delay:0.30s;}
 
-        /* ── Bottom bar ── */
-        .bottom-bar{
-          padding:0 20px 20px;
-          flex-shrink:0;
-          display:flex;
-          justify-content:center;
-        }
+        .bottom-bar{padding:0 20px 20px;flex-shrink:0;display:flex;justify-content:center;}
 
-        /* ── Icon buttons ── */
-        .icon-btn{
-          width:30px;height:30px;
-          border-radius:8px;background:transparent;border:none;
-          cursor:pointer;color:#8A8785;
-          display:flex;align-items:center;justify-content:center;
-          transition:background 130ms ease,color 130ms ease;
-          flex-shrink:0;
-        }
+        .icon-btn{width:30px;height:30px;border-radius:8px;background:transparent;border:none;cursor:pointer;color:#8A8785;display:flex;align-items:center;justify-content:center;transition:background 130ms ease,color 130ms ease;flex-shrink:0;}
         .icon-btn:hover{background:rgba(0,0,0,0.06);color:#1C1A18;}
         .icon-btn:disabled{opacity:0.35;cursor:not-allowed;}
-
-        .send-btn{
-          width:32px;height:32px;
-          border-radius:9px;
-          background:#1C1A18;border:none;
-          cursor:pointer;color:#F5F4F0;
-          display:flex;align-items:center;justify-content:center;
-          transition:all 140ms ease;flex-shrink:0;
-        }
+        .send-btn{width:32px;height:32px;border-radius:9px;background:#1C1A18;border:none;cursor:pointer;color:#F5F4F0;display:flex;align-items:center;justify-content:center;transition:all 140ms ease;flex-shrink:0;}
         .send-btn:hover:not(:disabled){background:#3A3835;transform:scale(1.05);}
         .send-btn:disabled{background:rgba(0,0,0,0.12);cursor:not-allowed;transform:none;}
 
-        /* ── Toasts ── */
         .toasts{padding:10px 20px 0;display:flex;flex-direction:column;gap:5px;flex-shrink:0;}
-
-        .toast{
-          padding:10px 14px;border-radius:11px;font-size:13.5px;line-height:1.5;
-          display:flex;align-items:flex-start;gap:8px;
-        }
-        .toast-reminder{background:rgba(255,252,224,0.95);border:1px solid rgba(185,165,60,0.18);color:#504010;}
-        .toast-error{background:rgba(255,240,240,0.95);border:1px solid rgba(185,60,60,0.18);color:#6A1A1A;}
-        .toast-close{background:none;border:none;cursor:pointer;color:inherit;opacity:0.4;margin-left:auto;flex-shrink:0;padding:0;font-size:17px;line-height:1;}
-        .toast-close:hover{opacity:0.9;}
-
-        .review-banner{
-          padding:10px 14px;border-radius:11px;
-          background:rgba(228,244,255,0.96);
-          border:1px solid rgba(80,145,200,0.18);
-          display:flex;align-items:center;gap:12px;
-        }
+        .review-banner{padding:10px 14px;border-radius:11px;background:rgba(228,244,255,0.96);border:1px solid rgba(80,145,200,0.18);display:flex;align-items:center;gap:12px;}
         .review-text{flex:1;min-width:0;}
         .review-label{font-size:10.5px;font-weight:600;letter-spacing:0.09em;text-transform:uppercase;color:#3570A8;margin-bottom:1px;}
         .review-sub{font-size:12.5px;color:#265580;}
-        .review-btn{
-          background:#1C1A18;color:white;border:none;border-radius:9px;
-          padding:6px 12px;font-size:13px;font-weight:500;
-          cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;
-          transition:background 130ms ease;
-        }
+        .review-btn{background:#1C1A18;color:white;border:none;border-radius:9px;padding:6px 12px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;transition:background 130ms ease;}
         .review-btn:hover{background:#3A3835;}
         .review-btn:disabled{opacity:0.6;cursor:not-allowed;}
 
-        /* ── Mobile nav ── */
-        .mobile-nav{
-          display:none;
-          align-items:center;
-          justify-content:space-between;
-          padding:0 16px;
-          height:56px;
-          background:#FAF9F5;
-          border-bottom:1px solid rgba(0,0,0,0.06);
-          flex-shrink:0;
-          position:sticky;top:0;z-index:20;
-        }
-        .mobile-nav-btn{
-          width:42px;height:42px;border-radius:50%;
-          background:rgba(255,255,255,0.85);border:none;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;
-          color:#3C3A38;
-          box-shadow:0 1px 4px rgba(0,0,0,0.09),0 0 0 1px rgba(0,0,0,0.05);
-          transition:all 140ms ease;flex-shrink:0;
-        }
+        .mobile-nav{display:none;align-items:center;justify-content:space-between;padding:0 16px;height:56px;background:#FAF9F5;border-bottom:1px solid rgba(0,0,0,0.06);flex-shrink:0;z-index:20;}
+        .mobile-nav-btn{width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,0.85);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#3C3A38;box-shadow:0 1px 4px rgba(0,0,0,0.09),0 0 0 1px rgba(0,0,0,0.05);transition:all 140ms ease;flex-shrink:0;}
         .mobile-nav-btn:hover{background:rgba(255,255,255,1);}
-        .mobile-nav-title{
-          font-family:'Lora',Georgia,serif;
-          font-size:17px;font-weight:500;color:#2A2825;letter-spacing:-0.1px;
-        }
+        .mobile-nav-title{font-family:'Lora',Georgia,serif;font-size:17px;font-weight:500;color:#2A2825;letter-spacing:-0.1px;}
 
-        /* ── Mobile menu ── */
         .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.20);z-index:40;backdrop-filter:blur(2px);animation:gfade2 0.18s ease;}
-        .drawer{
-          position:fixed;top:0;left:0;bottom:0;
-          width:min(285px,82vw);
-          background:rgba(244,242,238,0.97);
-          backdrop-filter:blur(40px);
-          -webkit-backdrop-filter:blur(40px);
-          z-index:41;display:flex;flex-direction:column;
-          padding:0 0 24px;
-          box-shadow:6px 0 30px rgba(0,0,0,0.11);
-          animation:dslide 0.22s cubic-bezier(0.32,0,0.18,1);
-        }
+        .drawer{position:fixed;top:0;left:0;bottom:0;width:min(285px,82vw);background:rgba(244,242,238,0.97);backdrop-filter:blur(40px);-webkit-backdrop-filter:blur(40px);z-index:41;display:flex;flex-direction:column;padding:0 0 24px;box-shadow:6px 0 30px rgba(0,0,0,0.11);animation:dslide 0.22s cubic-bezier(0.32,0,0.18,1);}
         @keyframes dslide{from{transform:translateX(-100%);}to{transform:translateX(0);}}
-
-        .drawer-header{
-          padding:20px 20px 14px;
-          display:flex;align-items:center;gap:10px;
-          border-bottom:1px solid rgba(0,0,0,0.07);margin-bottom:6px;
-        }
-        .drawer-logo-wrap{
-          width:30px;height:30px;
-          display:flex;align-items:center;justify-content:center;flex-shrink:0;
-        }
+        .drawer-header{padding:20px 20px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(0,0,0,0.07);margin-bottom:6px;}
+        .drawer-logo-wrap{width:30px;height:30px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
         .drawer-title{font-family:'Lora',Georgia,serif;font-size:17px;font-weight:500;color:#2A2825;letter-spacing:-0.1px;}
-
         .drawer-section{font-size:10.5px;font-weight:600;letter-spacing:0.11em;text-transform:uppercase;color:#AEABA5;padding:10px 20px 3px;}
-
-        .drawer-item{
-          display:flex;align-items:center;gap:12px;
-          padding:10px 20px;
-          color:#3C3A38;text-decoration:none;
-          font-size:14.5px;font-weight:400;
-          transition:background 120ms ease;
-        }
+        .drawer-item{display:flex;align-items:center;gap:12px;padding:10px 20px;color:#3C3A38;text-decoration:none;font-size:14.5px;font-weight:400;transition:background 120ms ease;}
         .drawer-item:hover{background:rgba(0,0,0,0.04);}
         .drawer-item svg{opacity:0.58;flex-shrink:0;}
-
         .drawer-footer{margin-top:auto;padding:0 14px;}
         .drawer-user{padding:11px 13px;border-radius:11px;background:rgba(0,0,0,0.04);}
         .drawer-email{font-size:13px;color:#3C3A38;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        .drawer-signout{
-          background:none;border:1px solid rgba(0,0,0,0.13);border-radius:8px;
-          padding:7px;font-size:13px;color:#6B6865;
-          cursor:pointer;font-family:inherit;width:100%;
-          transition:all 130ms ease;
-        }
+        .drawer-signout{background:none;border:1px solid rgba(0,0,0,0.13);border-radius:8px;padding:7px;font-size:13px;color:#6B6865;cursor:pointer;font-family:inherit;width:100%;transition:all 130ms ease;}
         .drawer-signout:hover{background:rgba(0,0,0,0.05);color:#1C1A18;}
 
-        /* ── Mobile input ── */
-        .mobile-input-area{
-          padding:8px 0 env(safe-area-inset-bottom,16px);
-          flex-shrink:0;position:relative;z-index:10;
-          background:#FAF9F5;
-        }
-        .mobile-panel{
-          background:#FFFFFF;
-          border-radius:20px;
-          border:1px solid rgba(0,0,0,0.08);
-          box-shadow:0 1px 12px rgba(0,0,0,0.05);
-          padding:14px 16px 12px;
-          margin:0 12px;
-          transition:box-shadow 200ms ease;
-        }
+        .mobile-input-area{display:none;padding:8px 0 env(safe-area-inset-bottom,16px);flex-shrink:0;position:relative;z-index:10;background:#FAF9F5;}
+        .mobile-panel{background:#FFFFFF;border-radius:20px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 1px 12px rgba(0,0,0,0.05);padding:14px 16px 12px;margin:0 12px;transition:box-shadow 200ms ease;}
         .mobile-placeholder{font-size:16px;color:#B0ADA8;font-weight:300;padding-bottom:10px;letter-spacing:-0.1px;}
-        .mobile-textarea{
-          width:100%;border:none;outline:none;resize:none;
-          background:transparent;
-          font-family:'DM Sans',-apple-system,sans-serif;
-          font-size:16px;line-height:1.55;
-          color:#1C1A18;
-          padding:0;
-          min-height:24px;max-height:200px;
-          overflow-y:auto;
-        }
+        .mobile-textarea{width:100%;border:none;outline:none;resize:none;background:transparent;font-family:'DM Sans',-apple-system,sans-serif;font-size:16px;line-height:1.55;color:#1C1A18;padding:0;min-height:24px;max-height:200px;overflow-y:auto;}
         .mobile-textarea::placeholder{color:#B0ADA8;font-weight:300;}
         .mobile-actions{display:flex;align-items:center;justify-content:space-between;padding-top:10px;}
         .mobile-right{display:flex;align-items:center;gap:10px;}
-
         .mobile-icon-btn{background:none;border:none;cursor:pointer;color:#8A8785;display:flex;align-items:center;padding:4px;transition:color 130ms ease;}
         .mobile-icon-btn:hover{color:#1C1A18;}
-
-        .mobile-voice-btn{
-          width:38px;height:38px;border-radius:50%;
-          background:#1C1A18;border:none;cursor:pointer;
-          display:flex;align-items:center;justify-content:center;
-          color:white;transition:all 140ms ease;flex-shrink:0;
-        }
+        .mobile-voice-btn{width:38px;height:38px;border-radius:50%;background:#1C1A18;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;color:white;transition:all 140ms ease;flex-shrink:0;}
         .mobile-voice-btn:hover{background:#3A3835;}
         .mobile-voice-btn.listening{background:linear-gradient(135deg,#5BA8D8,#80C4EC);animation:mpulse 1.8s ease infinite;}
         .mobile-voice-btn:disabled{opacity:0.5;cursor:not-allowed;}
-
-        .mobile-messages{flex:1;overflow-y:auto;padding:20px 16px 12px;display:flex;flex-direction:column;gap:16px;min-height:0;}
+        .mobile-messages{display:none;flex:1;overflow-y:auto;padding:20px 16px 12px;flex-direction:column;gap:16px;min-height:0;}
         .mobile-messages::-webkit-scrollbar{width:0px;}
-
-        /* ── Mobile empty ── */
-        .mobile-empty{
-          flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;
-          padding:0 28px 60px;text-align:center;background:#FAF9F5;
-        }
+        .mobile-empty{display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:0 28px 60px;text-align:center;background:#FAF9F5;}
         .mobile-orb{margin-bottom:24px;animation:orbpop 0.55s cubic-bezier(0.34,1.56,0.64,1) both;}
         .mobile-headline{font-family:'Lora',Georgia,serif;font-size:clamp(22px,7vw,28px);font-weight:400;color:#1C1A18;line-height:1.25;letter-spacing:-0.3px;animation:gfade 0.4s ease 0.18s both;}
 
         @media(max-width:700px){
+          .app{flex-direction:column!important;}
           .sidebar,.empty,.bottom-bar,.messages{display:none!important;}
-          .main{display:flex!important;flex-direction:column;flex:1;min-height:0;width:100%;}
-          .mobile-nav{display:flex!important;width:100%;flex-shrink:0;background:#FAF9F5;border-bottom:1px solid rgba(0,0,0,0.06);}
+          .main{display:flex!important;flex-direction:column!important;flex:1 1 0%!important;min-height:0!important;width:100%!important;height:auto!important;overflow:hidden!important;}
+          .mobile-nav{display:flex!important;width:100%!important;flex-shrink:0;}
           .mobile-empty{flex:1;display:flex!important;flex-direction:column;align-items:center;justify-content:center;}
-          .mobile-messages{flex:1;display:flex!important;}
-          .mobile-input-area{display:flex!important;flex-shrink:0;padding:0 0 20px;background:#FAF9F5;}
-          .mobile-panel{
-            width:calc(100% - 32px);
-            margin:0 16px;
-            background:#FFFFFF;
-            border-radius:20px;
-            border:1px solid rgba(0,0,0,0.08);
-            box-shadow:0 1px 12px rgba(0,0,0,0.05);
-            padding:14px 16px 12px;
-          }
+          .mobile-messages{flex:1;display:flex!important;flex-direction:column;overflow-y:auto;}
+          .mobile-input-area{display:flex!important;flex-direction:column;flex-shrink:0;padding:0 0 env(safe-area-inset-bottom,16px);background:#FAF9F5;}
+          .mobile-panel{width:calc(100% - 24px);margin:0 12px;background:#FFFFFF;border-radius:20px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 1px 12px rgba(0,0,0,0.05);padding:14px 16px 12px;}
         }
         @media(min-width:701px){
           .mobile-nav,.mobile-input-area,.mobile-messages,.mobile-empty{display:none!important;}
         }
 
-        /* ── Animations ── */
         @keyframes gfade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
         @keyframes gfade2{from{opacity:0;}to{opacity:1;}}
         @keyframes mmsg{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
@@ -825,57 +420,31 @@ export default function Page() {
         @keyframes orbpop{from{opacity:0;transform:scale(0.65);}to{opacity:1;transform:scale(1);}}
         @keyframes mspin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
         @keyframes mlistenpulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
+        @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:-200% 0;}}
         .listening-wave{animation:mlistenpulse 1.2s ease infinite;}
       `}</style>
 
       <div className="app">
-
-        {/* ━━━━━ DESKTOP SIDEBAR ━━━━━ */}
-        <aside className={`sidebar${sidebarCollapsed ? "" : ""}`}>
-          {/* Collapse toggle */}
+        <aside className="sidebar">
           <button className="sb-btn" data-tip="Toggle sidebar" onClick={() => setSidebarCollapsed(v => !v)} aria-label="Toggle sidebar" style={{ marginBottom:4 }}>
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <line x1="9" y1="3" x2="9" y2="21"/>
-            </svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
           </button>
-
-          {/* New chat */}
           <button className="sb-new" data-tip="New conversation" onClick={() => setMessages([])} aria-label="New conversation">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           </button>
-
           <div className="sb-divider" style={{ margin:"6px 0" }}/>
-
-          {/* Nav items */}
-          {NAV_ITEMS.map(({ href, label, icon }) => (
-            <a key={href} href={href} className="sb-btn" data-tip={label} aria-label={label}>{icon}</a>
-          ))}
-
+          {NAV_ITEMS.map(({ href, label, icon }) => (<a key={href} href={href} className="sb-btn" data-tip={label} aria-label={label}>{icon}</a>))}
           <div className="sb-spacer"/>
-
-          {/* User avatar */}
           {!loadingUser && email ? (
-            <button className="sb-avatar" data-tip="Sign out" onClick={() => void signOut()} aria-label="Sign out" style={{ position:"relative" }}>
-              {userInitial}
-            </button>
+            <button className="sb-avatar" data-tip="Sign out" onClick={() => void signOut()} aria-label="Sign out" style={{ position:"relative" }}>{userInitial}</button>
           ) : !loadingUser && (
-            <a href="/login" className="sb-btn" data-tip="Sign in" aria-label="Sign in">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            </a>
+            <a href="/login" className="sb-btn" data-tip="Sign in" aria-label="Sign in"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
           )}
         </aside>
 
-        {/* ━━━━━ MOBILE NAV ━━━━━ */}
         <nav className="mobile-nav">
           <button className="mobile-nav-btn" onClick={() => setMobileMenuOpen(true)} aria-label="Menu">
-            <svg width="17" height="13" viewBox="0 0 18 14" fill="none">
-              <rect width="18" height="2" rx="1" fill="currentColor"/>
-              <rect y="6" width="13" height="2" rx="1" fill="currentColor"/>
-              <rect y="12" width="18" height="2" rx="1" fill="currentColor"/>
-            </svg>
+            <svg width="17" height="13" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="13" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
           </button>
           <span className="mobile-nav-title">Memori</span>
           <button className="mobile-nav-btn" aria-label="Profile">
@@ -886,35 +455,17 @@ export default function Page() {
           </button>
         </nav>
 
-        {/* ━━━━━ MOBILE DRAWER ━━━━━ */}
         {mobileMenuOpen && (
           <>
             <div className="overlay" onClick={() => setMobileMenuOpen(false)}/>
             <div className="drawer" role="dialog" aria-modal="true">
-              <div className="drawer-header">
-                <div className="drawer-logo-wrap">
-                  <MemoriIcon size={30}/>
-                </div>
-                <span className="drawer-title">Memori</span>
-              </div>
+              <div className="drawer-header"><div className="drawer-logo-wrap"><MemoriIcon size={30}/></div><span className="drawer-title">Memori</span></div>
               <div className="drawer-section">Workspace</div>
-              {NAV_ITEMS.map(({ href, label, icon }) => (
-                <a key={href} href={href} className="drawer-item" onClick={() => setMobileMenuOpen(false)}>
-                  {icon}{label}
-                </a>
-              ))}
-              {summary && (
-                <>
-                  <div className="drawer-section" style={{ marginTop:8 }}>Identity</div>
-                  <p style={{ padding:"6px 20px 0", fontSize:13, color:"#6B6865", lineHeight:1.65 }}>{summary}</p>
-                </>
-              )}
+              {NAV_ITEMS.map(({ href, label, icon }) => (<a key={href} href={href} className="drawer-item" onClick={() => setMobileMenuOpen(false)}>{icon}{label}</a>))}
+              {summary && (<><div className="drawer-section" style={{ marginTop:8 }}>Identity</div><p style={{ padding:"6px 20px 0", fontSize:13, color:"#6B6865", lineHeight:1.65 }}>{summary}</p></>)}
               <div className="drawer-footer">
                 {!loadingUser && email ? (
-                  <div className="drawer-user">
-                    <div className="drawer-email">{email}</div>
-                    <button className="drawer-signout" onClick={() => { void signOut(); setMobileMenuOpen(false); }}>Sign out</button>
-                  </div>
+                  <div className="drawer-user"><div className="drawer-email">{email}</div><button className="drawer-signout" onClick={() => { void signOut(); setMobileMenuOpen(false); }}>Sign out</button></div>
                 ) : !loadingUser && (
                   <a href="/login" style={{ display:"block", textAlign:"center", padding:"11px", borderRadius:12, background:"#1C1A18", color:"#F5F4F0", fontSize:14, fontWeight:500, textDecoration:"none" }}>Sign in</a>
                 )}
@@ -923,235 +474,102 @@ export default function Page() {
           </>
         )}
 
-        {/* ━━━━━ MAIN ━━━━━ */}
         <main className="main">
-
-          {/* Toasts */}
           <div className="toasts">
             {reminder && (
-              <div style={{
-                display:"flex", alignItems:"center", gap:10,
-                padding:"9px 14px",
-                borderRadius:10,
-                background:"rgba(255,255,255,0.80)",
-                border:"1px solid rgba(0,0,0,0.09)",
-                backdropFilter:"blur(12px)",
-                fontSize:13.5,
-                color:"#4A4845",
-                lineHeight:1.45,
-              }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", borderRadius:10, background:"rgba(255,255,255,0.80)", border:"1px solid rgba(0,0,0,0.09)", backdropFilter:"blur(12px)", fontSize:13.5, color:"#4A4845", lineHeight:1.45 }}>
                 <span style={{ width:6, height:6, borderRadius:"50%", background:"#5BA8D8", flexShrink:0, display:"inline-block" }}/>
                 <span style={{ flex:1 }}>{reminder}</span>
-                <button onClick={() => setReminder(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>×</button>
+                <button onClick={() => setReminder(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>x</button>
               </div>
             )}
             {voiceError && (
-              <div style={{
-                display:"flex", alignItems:"center", gap:10,
-                padding:"9px 14px",
-                borderRadius:10,
-                background:"rgba(255,240,240,0.90)",
-                border:"1px solid rgba(185,60,60,0.15)",
-                backdropFilter:"blur(12px)",
-                fontSize:13.5,
-                color:"#6A1A1A",
-                lineHeight:1.45,
-              }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, padding:"9px 14px", borderRadius:10, background:"rgba(255,240,240,0.90)", border:"1px solid rgba(185,60,60,0.15)", backdropFilter:"blur(12px)", fontSize:13.5, color:"#6A1A1A", lineHeight:1.45 }}>
                 <span style={{ width:6, height:6, borderRadius:"50%", background:"#D05050", flexShrink:0, display:"inline-block" }}/>
                 <span style={{ flex:1 }}>{voiceError}</span>
-                <button onClick={() => setVoiceError(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>×</button>
+                <button onClick={() => setVoiceError(null)} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:16, lineHeight:1, padding:0, flexShrink:0 }}>x</button>
               </div>
             )}
             {!bannerHidden && (
               <div className="review-banner">
                 <div className="review-text">
-                  <div className="review-label">⚖️ {dueCount} review{dueCount !== 1 ? "s" : ""} due</div>
+                  <div className="review-label">{dueCount} review{dueCount !== 1 ? "s" : ""} due</div>
                   <div className="review-sub">Close the loop on your decisions.</div>
                 </div>
-                <button className="review-btn" onClick={() => void handleReviewNow()} disabled={reviewNowBusy}>
-                  {reviewNowBusy ? "Opening…" : "Review →"}
-                </button>
-                <button onClick={dismissToday} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:17, lineHeight:1, padding:"0 0 0 4px", flexShrink:0 }}>×</button>
+                <button className="review-btn" onClick={() => void handleReviewNow()} disabled={reviewNowBusy}>{reviewNowBusy ? "Opening..." : "Review"}</button>
+                <button onClick={dismissToday} style={{ background:"none", border:"none", cursor:"pointer", color:"#ABABAB", fontSize:17, lineHeight:1, padding:"0 0 0 4px", flexShrink:0 }}>x</button>
               </div>
             )}
           </div>
 
-          {/* ━━━ DESKTOP EMPTY STATE ━━━ */}
           {!hasMessages && !isTyping && (
             <div className="empty">
-              {/* Greeting row — icon inline with text */}
               <div className="greeting-row">
                 <MemoriIcon size={96} spinning={false}/>
                 <h1 className="greeting-text">{greetingPhrase}</h1>
               </div>
-
-              {/* Input card */}
-              <div className="input-card">
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={autoResize}
-                  onKeyDown={handleKeyDown}
-                  placeholder="How can I help you today?"
-                  rows={1}
-                  aria-label="Message input"
-                  autoFocus
-                />
+              <div className={`input-card${hasText ? " has-text" : ""}`}>
+                <textarea ref={inputRef} value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder="How can I help you today?" rows={1} aria-label="Message input" autoFocus/>
                 <div className="card-actions">
-                  <div className="card-left">
-                    <button className="icon-btn" aria-label="Attach" title="Attach">
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </button>
-                  </div>
+                  <div className="card-left"><button className="icon-btn" aria-label="Attach" title="Attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
                   <div className="card-right">
                     <span className="card-context">Memori</span>
                     {input.trim() ? (
-                      <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send">
-                        <SendIcon/>
-                      </button>
+                      <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send"><SendIcon/></button>
                     ) : (
-                      <button
-                        className="icon-btn"
-                        onClick={handleMicClick}
-                        disabled={voiceState === "connecting" || voiceState === "requesting" || voiceState === "processing"}
-                        aria-label={voiceState === "listening" ? "Stop recording" : "Voice input"}
-                        style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785", width:36, height:36, borderRadius:8, background: voiceState === "listening" ? "rgba(91,168,216,0.10)" : "transparent" }}
-                      >
-                        <span className={voiceState === "listening" ? "listening-wave" : ""}>
-                          {voiceState === "listening" ? (
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                              <line x1="4" y1="12" x2="4" y2="12"/><line x1="8" y1="8" x2="8" y2="16"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="16" y1="8" x2="16" y2="16"/><line x1="20" y1="12" x2="20" y2="12"/>
-                            </svg>
-                          ) : (
-                            <WaveformIcon/>
-                          )}
-                        </span>
+                      <button className="icon-btn" onClick={handleMicClick} disabled={voiceState === "connecting" || voiceState === "requesting" || voiceState === "processing"} aria-label={voiceState === "listening" ? "Stop recording" : "Voice input"} style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785", width:36, height:36, borderRadius:8, background: voiceState === "listening" ? "rgba(91,168,216,0.10)" : "transparent" }}>
+                        <span className={voiceState === "listening" ? "listening-wave" : ""}>{voiceState === "listening" ? (<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="4" y1="12" x2="4" y2="12"/><line x1="8" y1="8" x2="8" y2="16"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="16" y1="8" x2="16" y2="16"/><line x1="20" y1="12" x2="20" y2="12"/></svg>) : (<WaveformIcon/>)}</span>
                       </button>
                     )}
                   </div>
                 </div>
               </div>
-
-              {/* Chips */}
-              <div className="chips">
-                {CHIPS.map(({ label, icon }) => (
-                  <button key={label} className="chip" onClick={() => void sendMessage(label)}>
-                    {icon}{label}
-                  </button>
-                ))}
-              </div>
+              <div className="chips">{CHIPS.map(({ label, icon }) => (<button key={label} className="chip" onClick={() => void sendMessage(label)}>{icon}{label}</button>))}</div>
             </div>
           )}
 
-          {/* ━━━ DESKTOP MESSAGES ━━━ */}
           {(hasMessages || isTyping) && (
             <div className="messages" style={{ flexDirection:"column" }}>
               {messages.map((m, i) => (
                 <div key={i} className={`msg-row ${m.role}`}>
-                  {m.role === "assistant" && (
-                    <div className="assistant-icon">
-                      <MemoriIcon size={26} spinning={false}/>
-                    </div>
-                  )}
+                  {m.role === "assistant" && <div className="assistant-icon"><MemoriIcon size={26} spinning={false}/></div>}
                   {m.role === "assistant" && m.text.startsWith("__GMAIL_SENT__") ? (
-                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
-                      <div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>✓ Gmail compose opened</div>
-                      <div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>
-                        Draft ready for <strong>{m.text.match(/__GMAIL_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send in Gmail.
-                      </div>
-                    </div>
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}><div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>Gmail compose opened</div><div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>Draft ready for <strong>{m.text.match(/__GMAIL_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send in Gmail.</div></div>
                   ) : m.role === "assistant" && m.text.startsWith("__MSG_SENT__") ? (
-                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
-                      <div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>
-                        ✓ {m.text.match(/__KIND__(.*?)$/)?.[1] ?? "Message"} compose opened
-                      </div>
-                      <div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>
-                        Message drafted for <strong>{m.text.match(/__MSG_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send.
-                      </div>
-                    </div>
-                  ) : m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") && !m.text.startsWith("✓") && !m.text.startsWith("Reminder saved") ? (
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}><div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>{m.text.match(/__KIND__(.*?)$/)?.[1] ?? "Message"} compose opened</div><div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>Message drafted for <strong>{m.text.match(/__MSG_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send.</div></div>
+                  ) : m.role === "assistant" && m.text.includes("Should I proceed?") && !m.approved && !m.text.startsWith("Done") && !m.text.startsWith("Reminder saved") ? (
                     <div className="bubble assistant" style={{ padding:"14px 16px" }}>
                       <div style={{ fontSize:14.5, lineHeight:1.65, marginBottom:14, color:"#1C1A18", whiteSpace:"pre-wrap" }}>{m.text}</div>
                       <div style={{ display:"flex", gap:8 }}>
-                        <button
-                          onClick={() => void handleApprove(i, true)}
-                          disabled={!!approving}
-                          style={{ padding:"8px 18px", borderRadius:9, border:"none", background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}
-                        >
-                          {approving === String(i) ? "…" : "✓ Approve"}
-                        </button>
-                        <button
-                          onClick={() => void handleApprove(i, false)}
-                          disabled={!!approving}
-                          style={{ padding:"8px 18px", borderRadius:9, border:"1px solid rgba(0,0,0,0.14)", background:"transparent", color:"#6B6865", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}
-                        >
-                          Cancel
-                        </button>
+                        <button onClick={() => void handleApprove(i, true)} disabled={!!approving} style={{ padding:"8px 18px", borderRadius:9, border:"none", background:"#1C1A18", color:"#F5F4F0", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}>{approving === String(i) ? "..." : "Approve"}</button>
+                        <button onClick={() => void handleApprove(i, false)} disabled={!!approving} style={{ padding:"8px 18px", borderRadius:9, border:"1px solid rgba(0,0,0,0.14)", background:"transparent", color:"#6B6865", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, cursor:"pointer", opacity:approving?0.6:1, transition:"all 130ms ease" }}>Cancel</button>
                       </div>
                     </div>
                   ) : m.approved ? (
-                    <div className="bubble assistant" style={{ padding:"14px 16px" }}>
-                      <div style={{ fontSize:14, color:"#8A8785", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{m.text}</div>
-                      <div style={{ marginTop:10, fontSize:13, fontWeight:500, color: m.approved === "yes" ? "#1A5C32" : "#6B6865" }}>
-                        {m.approved === "yes" ? "✓ Approved" : "✗ Cancelled"}
-                      </div>
-                    </div>
+                    <div className="bubble assistant" style={{ padding:"14px 16px" }}><div style={{ fontSize:14, color:"#8A8785", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{m.text}</div><div style={{ marginTop:10, fontSize:13, fontWeight:500, color: m.approved === "yes" ? "#1A5C32" : "#6B6865" }}>{m.approved === "yes" ? "Approved" : "Cancelled"}</div></div>
                   ) : (
                     <div className={`bubble ${m.role}`}>{m.text}</div>
                   )}
                 </div>
               ))}
-              {isTyping && (
-                <div className="msg-row assistant">
-                  <div className="assistant-icon">
-                    <MemoriIcon size={26} spinning={true}/>
-                  </div>
-                  <div className="typing-bubble">
-                    <span className="dot"/><span className="dot"/><span className="dot"/>
-                  </div>
-                </div>
-              )}
-
+              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><MemoriIcon size={26} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
               <div ref={messagesEndRef}/>
             </div>
           )}
 
-          {/* ━━━ DESKTOP BOTTOM INPUT (chat mode) ━━━ */}
           {(hasMessages || isTyping) && (
             <div className="bottom-bar">
-              <div className="input-card" style={{ animation:"none" }}>
-                <textarea
-                  ref={inputRef}
-                  value={input}
-                  onChange={autoResize}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Reply to Memori…"
-                  rows={1}
-                  aria-label="Message input"
-                />
+              <div className={`input-card${hasText ? " has-text" : ""}`} style={{ animation:"none" }}>
+                <textarea ref={inputRef} value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder="Reply to Memori..." rows={1} aria-label="Message input"/>
                 <div className="card-actions">
-                  <div className="card-left">
-                    <button className="icon-btn" aria-label="Attach">
-                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                      </svg>
-                    </button>
-                  </div>
+                  <div className="card-left"><button className="icon-btn" aria-label="Attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
                   <div className="card-right">
                     <span className="card-context">Memori</span>
                     {input.trim() ? (
-                      <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send">
-                        <SendIcon/>
-                      </button>
+                      <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send"><SendIcon/></button>
                     ) : (
                       <button className="icon-btn" onClick={handleMicClick} disabled={voiceState==="connecting"||voiceState==="requesting"||voiceState==="processing"} aria-label="Voice" style={{ color: voiceState === "listening" ? "#5BA8D8" : "#8A8785", width:36, height:36, borderRadius:8 }}>
-                        {voiceState === "listening" ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>
-                        ) : (
-                          <WaveformIcon/>
-                        )}
+                        {voiceState === "listening" ? (<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>) : (<WaveformIcon/>)}
                       </button>
                     )}
                   </div>
@@ -1160,67 +578,31 @@ export default function Page() {
             </div>
           )}
 
-          {/* ━━━ MOBILE EMPTY STATE ━━━ */}
-          <div className="mobile-empty">
-            <div className="mobile-orb"><MemoriIcon size={72}/></div>
-            <h1 className="mobile-headline">How can I help you<br/>today?</h1>
-          </div>
+          {!hasMessages && !isTyping && (
+            <div className="mobile-empty"><div className="mobile-orb"><MemoriIcon size={72}/></div><h1 className="mobile-headline">How can I help you<br/>today?</h1></div>
+          )}
 
-          {/* ━━━ MOBILE MESSAGES ━━━ */}
-          <div className="mobile-messages" style={{ flexDirection:"column" }}>
-            {messages.map((m, i) => (
-              <div key={i} className={`msg-row ${m.role}`}>
-                {m.role === "assistant" && <div className="assistant-icon"><MemoriIcon size={24} spinning={false}/></div>}
-                <div className={`bubble ${m.role}`}>{m.text}</div>
-              </div>
-            ))}
-            {isTyping && (
-              <div className="msg-row assistant">
-                <div className="assistant-icon"><MemoriIcon size={24} spinning={true}/></div>
-                <div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div>
-              </div>
-            )}
-            <div ref={messagesEndRef}/>
-          </div>
+          {(hasMessages || isTyping) && (
+            <div className="mobile-messages" style={{ flexDirection:"column" }}>
+              {messages.map((m, i) => (<div key={i} className={`msg-row ${m.role}`}>{m.role === "assistant" && <div className="assistant-icon"><MemoriIcon size={24} spinning={false}/></div>}<div className={`bubble ${m.role}`}>{m.text}</div></div>))}
+              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><MemoriIcon size={24} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
+              <div ref={messagesEndRef}/>
+            </div>
+          )}
 
-          {/* ━━━ MOBILE INPUT ━━━ */}
           <div className="mobile-input-area">
             <div className="mobile-panel">
               {!input && !hasMessages && <div className="mobile-placeholder">Chat with Memori</div>}
-              <textarea
-                value={input}
-                onChange={autoResize}
-                onKeyDown={handleKeyDown}
-                placeholder={hasMessages ? "Reply…" : ""}
-                rows={1}
-                className="mobile-textarea"
-                aria-label="Message input"
-              />
+              <textarea value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder={hasMessages ? "Reply..." : ""} rows={1} className="mobile-textarea" aria-label="Message input"/>
               <div className="mobile-actions">
-                <button className="mobile-icon-btn" aria-label="Attach">
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                  </svg>
-                </button>
+                <button className="mobile-icon-btn" aria-label="Attach"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
                 <div className="mobile-right">
-                  {input.trim() && (
-                    <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send" style={{ width:38, height:38, borderRadius:10 }}>
-                      <SendIcon/>
-                    </button>
-                  )}
-                  <button
-                    className={`mobile-voice-btn${voiceState === "listening" ? " listening" : ""}`}
-                    onClick={handleMicClick}
-                    disabled={voiceState==="connecting"||voiceState==="requesting"||voiceState==="processing"}
-                    aria-label="Voice"
-                  >
-                    <WaveformIcon/>
-                  </button>
+                  {input.trim() && (<button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send" style={{ width:38, height:38, borderRadius:10 }}><SendIcon/></button>)}
+                  <button className={`mobile-voice-btn${voiceState === "listening" ? " listening" : ""}`} onClick={handleMicClick} disabled={voiceState==="connecting"||voiceState==="requesting"||voiceState==="processing"} aria-label="Voice"><WaveformIcon/></button>
                 </div>
               </div>
             </div>
           </div>
-
         </main>
       </div>
     </>
