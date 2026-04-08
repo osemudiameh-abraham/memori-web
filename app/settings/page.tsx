@@ -202,7 +202,7 @@ export default function SettingsPage() {
                     <SettingRow label="Push notifications" sub="Browser push notifications for due reminders">
                       <Toggle on={prefs.push_enabled} onChange={v => setPrefs(p => ({ ...p, push_enabled: v }))}/>
                     </SettingRow>
-                    <SettingRow label="Reminder time" sub="What time of day should Memori send reminders?">
+                    <SettingRow label="Reminder time" sub="What time of day should Seven send reminders?">
                       <input type="time" value={prefs.reminder_time} onChange={e => setPrefs(p => ({ ...p, reminder_time: e.target.value }))} style={{ ...inp, width:120 }}/>
                     </SettingRow>
                     <SettingRow label="Timezone" sub="Used to calculate correct reminder delivery time">
@@ -229,10 +229,10 @@ export default function SettingsPage() {
                     <SettingRow label="Third-party sharing" sub="Your data is never sold or shared with advertisers or data brokers">
                       <span style={{ fontSize:12, fontWeight:600, color:"#1A5C32", background:"rgba(20,140,60,0.10)", padding:"3px 10px", borderRadius:100 }}>Never</span>
                     </SettingRow>
-                    <SettingRow label="Governance audit" sub="Full trace of every response — see exactly what Memori used to answer">
+                    <SettingRow label="Governance audit" sub="Full trace of every response — see exactly what Seven used to answer">
                       <a href="/trace" style={{ fontSize:13.5, color:"#3A3835", textDecoration:"none", padding:"6px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)" }}>View trace →</a>
                     </SettingRow>
-                    <SettingRow label="Facts audit" sub="View, correct, or dispute any fact Memori has stored about you">
+                    <SettingRow label="Facts audit" sub="View, correct, or dispute any fact Seven has stored about you">
                       <a href="/facts" style={{ fontSize:13.5, color:"#3A3835", textDecoration:"none", padding:"6px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)" }}>View facts →</a>
                     </SettingRow>
                   </SectionCard>
@@ -250,7 +250,7 @@ export default function SettingsPage() {
                     <SettingRow label="Memory vault" sub="View, correct, or delete individual memories">
                       <a href="/vault" style={{ fontSize:13.5, color:"#3A3835", textDecoration:"none", padding:"6px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)" }}>Open vault →</a>
                     </SettingRow>
-                    <SettingRow label="Decision ledger" sub="Review all decisions and outcomes Memori has recorded">
+                    <SettingRow label="Decision ledger" sub="Review all decisions and outcomes Seven has recorded">
                       <a href="/reviews" style={{ fontSize:13.5, color:"#3A3835", textDecoration:"none", padding:"6px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)" }}>Open ledger →</a>
                     </SettingRow>
                   </SectionCard>
@@ -260,7 +260,7 @@ export default function SettingsPage() {
                 {activeSection === "account" && (
                   <>
                     <SectionCard title="Account" icon="👤">
-                      <SettingRow label="Email address" sub="Your Memori account email">
+                      <SettingRow label="Email address" sub="Your Seven account email">
                         <span style={{ fontSize:14, color:"#4A4845" }}>{email ?? "—"}</span>
                       </SettingRow>
                       <SettingRow label="Gmail" sub="Connect Gmail to send emails directly from your account">
@@ -269,7 +269,7 @@ export default function SettingsPage() {
                         </a>
                       </SettingRow>
 
-                      <SettingRow label="Sign out" sub="Sign out of Memori on this device">
+                      <SettingRow label="Sign out" sub="Sign out of Seven on this device">
                         <button onClick={() => void signOut()} style={{ padding:"7px 14px", borderRadius:9, border:"1px solid rgba(0,0,0,0.14)", background:"rgba(255,255,255,0.80)", fontFamily:"'DM Sans',sans-serif", fontSize:13.5, cursor:"pointer", color:"#3C3A38" }}>
                           Sign out
                         </button>

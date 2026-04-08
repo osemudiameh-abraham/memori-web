@@ -111,7 +111,7 @@ function TracePageInner() {
                 Traces are opened from a chat response.<br/>Go back to the home page and start a conversation.
               </div>
               <a href="/" style={{ display:"inline-flex", alignItems:"center", gap:6, marginTop:20, padding:"10px 20px", borderRadius:11, background:"#1C1A18", color:"#FAF9F5", fontSize:14, fontWeight:500, textDecoration:"none" }}>
-                Back to Memori
+                Back to Seven
               </a>
             </div>
           )}
@@ -136,7 +136,7 @@ function TracePageInner() {
               <div style={{ display:"flex", gap:12, flexWrap:"wrap" }}>
                 {[
                   { label:"Captured", value:fmt(data.trace.created_at) },
-                  { label:"Memories used", value:String(data.trace.picked_memory_ids.length) },
+                  { label:"Sevenes used", value:String(data.trace.picked_memory_ids.length) },
                   { label:"Strategy steps", value:String((data.trace.strategy_history ?? []).length) },
                 ].map(m => (
                   <div key={m.label} style={{ ...card, flex:"1", minWidth:140, padding:"12px 16px" }}>
@@ -155,13 +155,13 @@ function TracePageInner() {
                     <div style={{ fontSize:15, lineHeight:1.65, color:"#1C1A18", background:"rgba(0,0,0,0.025)", padding:"12px 14px", borderRadius:10, whiteSpace:"pre-wrap" }}>{data.trace.query_text}</div>
                   </div>
                   <div>
-                    <div style={{ fontSize:11.5, fontWeight:600, color:"#8A8785", marginBottom:6, letterSpacing:"0.05em", textTransform:"uppercase" }}>Memori responded</div>
+                    <div style={{ fontSize:11.5, fontWeight:600, color:"#8A8785", marginBottom:6, letterSpacing:"0.05em", textTransform:"uppercase" }}>Seven responded</div>
                     <div style={{ fontSize:15, lineHeight:1.65, color:"#1C1A18", background:"rgba(0,0,0,0.025)", padding:"12px 14px", borderRadius:10, whiteSpace:"pre-wrap" }}>{data.trace.assistant_text}</div>
                   </div>
                 </div>
               </div>
 
-              {/* Memories used */}
+              {/* Sevenes used */}
               <div style={card}>
                 <div style={sectionLabel}>Memory IDs used ({data.trace.picked_memory_ids.length})</div>
                 {data.trace.picked_memory_ids.length === 0 ? (

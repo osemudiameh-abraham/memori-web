@@ -6,7 +6,7 @@ import type {
   MemorySnippet,
 } from "@/lib/preprocessing/types";
 
-export async function fetchMemoriesForUser(userId: string): Promise<MemorySnippet[]> {
+export async function fetchSevenesForUser(userId: string): Promise<MemorySnippet[]> {
   const supabase = await createSupabaseServerClient();
 
   const { data, error } = await supabase
@@ -56,7 +56,7 @@ export function canonicalFactsToMemorySnippets(facts: CanonicalFact[]): MemorySn
   }));
 }
 
-export async function bumpMemoriesRecalled(ids: string[]): Promise<void> {
+export async function bumpSevenesRecalled(ids: string[]): Promise<void> {
   if (!ids.length) return;
 
   const realIds = ids.filter((id) => !String(id).startsWith("fact:"));

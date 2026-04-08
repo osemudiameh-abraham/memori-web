@@ -7,8 +7,8 @@ import { getContextSignals } from "@/lib/preprocessing/contextSignals";
 import { loadIdentityContext } from "@/lib/identity/context";
 
 import {
-  fetchMemoriesForUser,
-  bumpMemoriesRecalled,
+  fetchSevenesForUser,
+  bumpSevenesRecalled,
   archiveMemory,
   storeFactMemory,
   upsertCanonicalFact,
@@ -16,7 +16,7 @@ import {
   canonicalFactsToMemorySnippets,
 } from "@/lib/memory/store";
 
-import { pickRelevantMemories } from "@/lib/memory/search";
+import { pickRelevantSevenes } from "@/lib/memory/search";
 
 import { proposeMode } from "@/lib/cognition/sophistication";
 import { runLLM } from "@/lib/model-client";
@@ -1153,11 +1153,11 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const [allMemories, canonicalFacts] = await Promise.all([
-      fetchMemoriesForUser(user.id),
+    const [allSevenes, canonicalFacts] = await Promise.all([
+      fetchSevenesForUser(user.id),
       fetchCanonicalFactsForUser(user.id),
     ]);
-    const recallSafeMemories = filterGovernanceNotes(allMemories);
+    const recallSafeSevenes = filterGovernanceNotes(allSevenes);
 
     const direct = directFactAnswer(text, canonicalFacts, identityContext);
     if (direct) {
@@ -1175,8 +1175,8 @@ export async function POST(req: NextRequest) {
     }
 
     const canonicalSnippets = canonicalFactsToMemorySnippets(canonicalFacts);
-    const mergedMemories = [...canonicalSnippets, ...recallSafeMemories];
-    const withInfluence = attachInfluence(mergedMemories);
+    const mergedSevenes = [...canonicalSnippets, ...recallSafeSevenes];
+    const withInfluence = attachInfluence(mergedSevenes);
     const archiveSignal = computeArchiveSignal(withInfluence);
 
     const archiveCmd = normalizeArchiveCmd(text);
@@ -1197,7 +1197,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const picked = pickRelevantMemories(withInfluence, text, 12);
+    const picked = pickRelevantSevenes(withInfluence, text, 12);
     const contextSignals = (body as any).contextSignals ?? getContextSignals(text);
 
     const proposed_mode: RhetoricalMode = proposeMode({
@@ -1221,7 +1221,7 @@ export async function POST(req: NextRequest) {
 
     const out = await runLLM({ payload, proposed_mode, history });
 
-    void bumpMemoriesRecalled(picked.map((m) => String(m.id)));
+    void bumpSevenesRecalled(picked.map((m) => String(m.id)));
 
     return respond({
       mode: out.mode,

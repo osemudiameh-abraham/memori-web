@@ -50,7 +50,7 @@ function buildSimpleInsight(params: {
   const outcomeCount = params.outcomes.length;
 
   if (decisionCount === 0 && factCount === 0 && outcomeCount === 0) {
-    return "You haven’t added much this week yet. The more you share, the more Memori can help.";
+    return "You haven’t added much this week yet. The more you share, the more Seven can help.";
   }
 
   if (decisionCount > 0 && outcomeCount === 0) {
@@ -62,10 +62,10 @@ function buildSimpleInsight(params: {
   }
 
   if (factCount > 0) {
-    return "Memori is learning more about you each day.";
+    return "Seven is learning more about you each day.";
   }
 
-  return "Your week is beginning to take shape in Memori.";
+  return "Your week is beginning to take shape in Seven.";
 }
 
 export async function GET(_req: NextRequest) {

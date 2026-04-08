@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const userId = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://memori-web.vercel.app";
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://sevenmynd.com";
 
   if (error || !code || !userId) {
     return NextResponse.redirect(`${appUrl}/settings?gmail=error`);

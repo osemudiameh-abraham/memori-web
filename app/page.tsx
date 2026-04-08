@@ -258,8 +258,8 @@ export default function Page() {
   const greetingPhrase = getGreetingPhrase(selfName);
   const hasText = input.trim().length > 0;
 
-  const MemoriIcon = ({ size = 42, spinning = false }: { size?: number; spinning?: boolean }) => (
-    <img src="/memori-icon.png" alt="Memori" style={{ width: size, height: size, objectFit: "contain", animation: spinning ? "mspin 1.2s linear infinite" : "none", flexShrink: 0 }}/>
+  const SevenIcon = ({ size = 42, spinning = false }: { size?: number; spinning?: boolean }) => (
+    <img src="/memori-icon.png" alt="Seven" style={{ width: size, height: size, objectFit: "contain", animation: spinning ? "mspin 1.2s linear infinite" : "none", flexShrink: 0 }}/>
   );
 
   const WaveformIcon = () => (
@@ -448,7 +448,7 @@ export default function Page() {
           <button className="mobile-nav-btn" onClick={() => setMobileMenuOpen(true)} aria-label="Menu">
             <svg width="17" height="13" viewBox="0 0 18 14" fill="none"><rect width="18" height="2" rx="1" fill="currentColor"/><rect y="6" width="13" height="2" rx="1" fill="currentColor"/><rect y="12" width="18" height="2" rx="1" fill="currentColor"/></svg>
           </button>
-          <span className="mobile-nav-title">Memori</span>
+          <span className="mobile-nav-title">Seven</span>
           <button className="mobile-nav-btn" aria-label="Profile">
             {!loadingUser && email
               ? <span style={{ fontFamily:"DM Sans,sans-serif", fontSize:14, fontWeight:600, color:"#3C3A38" }}>{userInitial}</span>
@@ -461,7 +461,7 @@ export default function Page() {
           <>
             <div className="overlay" onClick={() => setMobileMenuOpen(false)}/>
             <div className="drawer" role="dialog" aria-modal="true">
-              <div className="drawer-header"><div className="drawer-logo-wrap"><MemoriIcon size={30}/></div><span className="drawer-title">Memori</span></div>
+              <div className="drawer-header"><div className="drawer-logo-wrap"><SevenIcon size={30}/></div><span className="drawer-title">Seven</span></div>
               <div className="drawer-section">Workspace</div>
               {NAV_ITEMS.map(({ href, label, icon }) => (<a key={href} href={href} className="drawer-item" onClick={() => setMobileMenuOpen(false)}>{icon}{label}</a>))}
               {summary && (<><div className="drawer-section" style={{ marginTop:8 }}>Identity</div><p style={{ padding:"6px 20px 0", fontSize:13, color:"#6B6865", lineHeight:1.65 }}>{summary}</p></>)}
@@ -507,7 +507,7 @@ export default function Page() {
           {!hasMessages && !isTyping && (
             <div className="empty">
               <div className="greeting-row">
-                <MemoriIcon size={96} spinning={false}/>
+                <SevenIcon size={96} spinning={false}/>
                 <h1 className="greeting-text">{greetingPhrase}</h1>
               </div>
               <div className={`input-card${hasText ? " has-text" : ""}`}>
@@ -515,7 +515,7 @@ export default function Page() {
                 <div className="card-actions">
                   <div className="card-left"><button className="icon-btn" aria-label="Attach" title="Attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
                   <div className="card-right">
-                    <span className="card-context">Memori</span>
+                    <span className="card-context">Seven</span>
                     {input.trim() ? (
                       <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send"><SendIcon/></button>
                     ) : (
@@ -534,7 +534,7 @@ export default function Page() {
             <div className="messages" style={{ flexDirection:"column" }}>
               {messages.map((m, i) => (
                 <div key={i} className={`msg-row ${m.role}`}>
-                  {m.role === "assistant" && <div className="assistant-icon"><MemoriIcon size={26} spinning={false}/></div>}
+                  {m.role === "assistant" && <div className="assistant-icon"><SevenIcon size={26} spinning={false}/></div>}
                   {m.role === "assistant" && m.text.startsWith("__GMAIL_SENT__") ? (
                     <div className="bubble assistant" style={{ padding:"14px 16px" }}><div style={{ fontSize:14, color:"#1A5C32", fontWeight:500, marginBottom:4 }}>Gmail compose opened</div><div style={{ fontSize:13.5, color:"#4A4845", lineHeight:1.55 }}>Draft ready for <strong>{m.text.match(/__GMAIL_SENT__(.*?)__/)?.[1] ?? "them"}</strong> — review and hit Send in Gmail.</div></div>
                   ) : m.role === "assistant" && m.text.startsWith("__MSG_SENT__") ? (
@@ -554,7 +554,7 @@ export default function Page() {
                   )}
                 </div>
               ))}
-              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><MemoriIcon size={26} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
+              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><SevenIcon size={26} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
               <div ref={messagesEndRef}/>
             </div>
           )}
@@ -562,11 +562,11 @@ export default function Page() {
           {(hasMessages || isTyping) && (
             <div className="bottom-bar">
               <div className={`input-card${hasText ? " has-text" : ""}`} style={{ animation:"none" }}>
-                <textarea ref={inputRef} value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder="Reply to Memori..." rows={1} aria-label="Message input"/>
+                <textarea ref={inputRef} value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder="Reply to Seven..." rows={1} aria-label="Message input"/>
                 <div className="card-actions">
                   <div className="card-left"><button className="icon-btn" aria-label="Attach"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button></div>
                   <div className="card-right">
-                    <span className="card-context">Memori</span>
+                    <span className="card-context">Seven</span>
                     {input.trim() ? (
                       <button className="send-btn" onClick={() => void sendMessage(input)} disabled={isBusy} aria-label="Send"><SendIcon/></button>
                     ) : (
@@ -581,20 +581,20 @@ export default function Page() {
           )}
 
           {!hasMessages && !isTyping && (
-            <div className="mobile-empty"><div className="mobile-orb"><MemoriIcon size={72}/></div><h1 className="mobile-headline">How can I help you<br/>today?</h1></div>
+            <div className="mobile-empty"><div className="mobile-orb"><SevenIcon size={72}/></div><h1 className="mobile-headline">How can I help you<br/>today?</h1></div>
           )}
 
           {(hasMessages || isTyping) && (
             <div className="mobile-messages" style={{ flexDirection:"column" }}>
-              {messages.map((m, i) => (<div key={i} className={`msg-row ${m.role}`}>{m.role === "assistant" && <div className="assistant-icon"><MemoriIcon size={24} spinning={false}/></div>}<div className={`bubble ${m.role}`}>{m.text}</div></div>))}
-              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><MemoriIcon size={24} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
+              {messages.map((m, i) => (<div key={i} className={`msg-row ${m.role}`}>{m.role === "assistant" && <div className="assistant-icon"><SevenIcon size={24} spinning={false}/></div>}<div className={`bubble ${m.role}`}>{m.text}</div></div>))}
+              {isTyping && (<div className="msg-row assistant"><div className="assistant-icon"><SevenIcon size={24} spinning={true}/></div><div className="typing-bubble"><span className="dot"/><span className="dot"/><span className="dot"/></div></div>)}
               <div ref={messagesEndRef}/>
             </div>
           )}
 
           <div className="mobile-input-area">
             <div className="mobile-panel">
-              {!input && !hasMessages && <div className="mobile-placeholder">Chat with Memori</div>}
+              {!input && !hasMessages && <div className="mobile-placeholder">Chat with Seven</div>}
               <textarea value={input} onChange={autoResize} onKeyDown={handleKeyDown} placeholder={hasMessages ? "Reply..." : ""} rows={1} className="mobile-textarea" aria-label="Message input"/>
               <div className="mobile-actions">
                 <button className="mobile-icon-btn" aria-label="Attach"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>

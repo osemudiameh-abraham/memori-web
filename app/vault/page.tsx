@@ -160,7 +160,7 @@ export default function VaultPage() {
         </div>
 
         <div style={{ maxWidth:680, margin:"0 auto", padding:"28px 24px 60px" }}>
-          <p style={{ fontSize:14, color:"#8A8785", marginBottom:20, lineHeight:1.55 }}>Everything Memori knows about you — facts, people, and organisations extracted from your conversations.</p>
+          <p style={{ fontSize:14, color:"#8A8785", marginBottom:20, lineHeight:1.55 }}>Everything Seven knows about you — facts, people, and organisations extracted from your conversations.</p>
 
           {error && <div style={{ padding:"12px 16px", borderRadius:12, background:"rgba(255,240,240,0.95)", border:"1px solid rgba(185,60,60,0.18)", color:"#6A1A1A", fontSize:14, marginBottom:20 }}>{error}</div>}
 
@@ -193,7 +193,7 @@ export default function VaultPage() {
               <div style={{ textAlign:"center", padding:"48px 24px", background:"rgba(255,255,255,0.80)", borderRadius:16, border:"1px solid rgba(0,0,0,0.08)" }}>
                 <div style={{ fontSize:32, marginBottom:16 }}>🕸</div>
                 <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:18, color:"#2A2825", marginBottom:8 }}>No entities yet</div>
-                <div style={{ fontSize:14, color:"#8A8785", lineHeight:1.58 }}>As you chat with Memori and mention people, companies, and places, they will appear here automatically.</div>
+                <div style={{ fontSize:14, color:"#8A8785", lineHeight:1.58 }}>As you chat with Seven and mention people, companies, and places, they will appear here automatically.</div>
               </div>
             ) : (
               <>

@@ -159,8 +159,8 @@ export default function OnboardingPage() {
       <div className="ob-root">
         <div className="ob-card">
           <div className="ob-logo">
-            <img src="/memori-icon.png" alt="Memori" />
-            <span className="ob-brand">Memori</span>
+            <img src="/memori-icon.png" alt="Seven" />
+            <span className="ob-brand">Seven</span>
             {step > 0 && step < 5 && <span className="ob-step-label">Step {step} of 4</span>}
           </div>
 
@@ -172,31 +172,31 @@ export default function OnboardingPage() {
             <>
               <div className="ob-label">Getting started</div>
               <h1 className="ob-heading">Your memory,<br/>built to last.</h1>
-              <p className="ob-sub">Memori remembers what matters &mdash; your decisions, your life, your patterns &mdash; and keeps it safe. Set up takes about 2 minutes.</p>
+              <p className="ob-sub">Seven remembers what matters &mdash; your decisions, your life, your patterns &mdash; and keeps it safe. Set up takes about 2 minutes.</p>
               <div className="trust-bar">
                 {[{i:"🔒",t:"Encrypted"},{i:"👁",t:"You own it"},{i:"🚫",t:"Never sold"},{i:"🛡",t:"Always correctable"}].map(({i,t})=>(
                   <div key={t} className="trust-pill">{i} {t}</div>
                 ))}
               </div>
               <div className="feature-list">
-                <div className="feature-row"><div className="feature-icon-box">🧠</div><div><div className="feature-title">Persistent memory</div><div className="feature-desc">Memori remembers facts about your life across every conversation.</div></div></div>
-                <div className="feature-row"><div className="feature-icon-box">⚖️</div><div><div className="feature-title">Decision accountability</div><div className="feature-desc">Log decisions and Memori reminds you to review the outcomes.</div></div></div>
-                <div className="feature-row"><div className="feature-icon-box">🛡</div><div><div className="feature-title">Full governance</div><div className="feature-desc">View, correct, dispute, or delete everything Memori knows. Always.</div></div></div>
+                <div className="feature-row"><div className="feature-icon-box">🧠</div><div><div className="feature-title">Persistent memory</div><div className="feature-desc">Seven remembers facts about your life across every conversation.</div></div></div>
+                <div className="feature-row"><div className="feature-icon-box">⚖️</div><div><div className="feature-title">Decision accountability</div><div className="feature-desc">Log decisions and Seven reminds you to review the outcomes.</div></div></div>
+                <div className="feature-row"><div className="feature-icon-box">🛡</div><div><div className="feature-title">Full governance</div><div className="feature-desc">View, correct, dispute, or delete everything Seven knows. Always.</div></div></div>
               </div>
               <button className="btn-primary" onClick={next} style={{animation:"fadeUp 0.4s ease 0.34s both"}}>Get started →</button>
-              <a href="/" className="back-link">← Back to Memori</a>
+              <a href="/" className="back-link">← Back to Seven</a>
             </>
           )}
 
           {step === 1 && (
             <>
               <div className="ob-label">About you</div>
-              <h1 className="ob-heading">Tell Memori who you are.</h1>
-              <p className="ob-sub">This lets Memori greet you correctly and personalise its responses from day one.</p>
-              <div className="field"><label className="field-label">Your name</label><input className="field-input" value={values.name??""} onChange={e=>set("name",e.target.value)} placeholder="Abraham" autoFocus/><div className="field-hint">How Memori will address you</div></div>
+              <h1 className="ob-heading">Tell Seven who you are.</h1>
+              <p className="ob-sub">This lets Seven greet you correctly and personalise its responses from day one.</p>
+              <div className="field"><label className="field-label">Your name</label><input className="field-input" value={values.name??""} onChange={e=>set("name",e.target.value)} placeholder="Abraham" autoFocus/><div className="field-hint">How Seven will address you</div></div>
               <div className="field"><label className="field-label">City</label><input className="field-input" value={values.city??""} onChange={e=>set("city",e.target.value)} placeholder="London"/><div className="field-hint">Used for local context</div></div>
               <div className="field"><label className="field-label">Timezone</label><input className="field-input" value={values.timezone??""} onChange={e=>set("timezone",e.target.value)} placeholder="Europe/London"/><div className="field-hint">e.g. Europe/London, America/New_York</div></div>
-              <div className="field"><label className="field-label">Company or project</label><input className="field-input" value={values.company??""} onChange={e=>set("company",e.target.value)} placeholder="Memori"/><div className="field-hint">Where you work or what you are building</div></div>
+              <div className="field"><label className="field-label">Company or project</label><input className="field-input" value={values.company??""} onChange={e=>set("company",e.target.value)} placeholder="Seven"/><div className="field-hint">Where you work or what you are building</div></div>
               <div className="field"><label className="field-label">Your role</label><input className="field-input" value={values.role??""} onChange={e=>set("role",e.target.value)} placeholder="CEO, Founder, Engineer..."/></div>
               <div className="nav-row"><button className="btn-back" onClick={back}>Back</button><button className="btn-primary" style={{flex:1}} onClick={next}>Continue →</button></div>
             </>
@@ -206,7 +206,7 @@ export default function OnboardingPage() {
             <>
               <div className="ob-label">Your world</div>
               <h1 className="ob-heading">The people and things that matter.</h1>
-              <p className="ob-sub">Memori uses this to understand your context so you never have to explain it again.</p>
+              <p className="ob-sub">Seven uses this to understand your context so you never have to explain it again.</p>
               <div className="field"><label className="field-label">One important person in your life</label><input className="field-input" value={values.relationshipLabel??""} onChange={e=>set("relationshipLabel",e.target.value)} placeholder="colleague, partner, friend, sister..." autoFocus/><div className="field-hint">Type of relationship</div></div>
               <div className="field"><label className="field-label">Their name</label><input className="field-input" value={values.relationshipName??""} onChange={e=>set("relationshipName",e.target.value)} placeholder="James"/></div>
               <div className="field"><label className="field-label">Pet type</label><input className="field-input" value={values.petType??""} onChange={e=>set("petType",e.target.value)} placeholder="dog, cat..."/><div className="field-hint">Optional</div></div>
@@ -220,9 +220,9 @@ export default function OnboardingPage() {
             <>
               <div className="ob-label">Goals and preferences</div>
               <h1 className="ob-heading">What are you working toward?</h1>
-              <p className="ob-sub">Memori uses this to give you more relevant advice and surface better patterns over time.</p>
-              <div className="field"><label className="field-label">Current goal</label><textarea className="field-input" value={values.currentGoal??""} onChange={e=>set("currentGoal",e.target.value)} placeholder="I am building Memori and trying to get to 100 active users by Q3..." rows={4} autoFocus/><div className="field-hint">Memori will keep this in context during conversations</div></div>
-              <div className="field"><label className="field-label">Important preference</label><textarea className="field-input" value={values.importantPreference??""} onChange={e=>set("importantPreference",e.target.value)} placeholder="I prefer direct, concise answers. I do not like vague advice..." rows={3}/><div className="field-hint">Something Memori should always remember about how you like to work</div></div>
+              <p className="ob-sub">Seven uses this to give you more relevant advice and surface better patterns over time.</p>
+              <div className="field"><label className="field-label">Current goal</label><textarea className="field-input" value={values.currentGoal??""} onChange={e=>set("currentGoal",e.target.value)} placeholder="I am building Seven and trying to get to 100 active users by Q3..." rows={4} autoFocus/><div className="field-hint">Seven will keep this in context during conversations</div></div>
+              <div className="field"><label className="field-label">Important preference</label><textarea className="field-input" value={values.importantPreference??""} onChange={e=>set("importantPreference",e.target.value)} placeholder="I prefer direct, concise answers. I do not like vague advice..." rows={3}/><div className="field-hint">Something Seven should always remember about how you like to work</div></div>
               <div className="nav-row"><button className="btn-back" onClick={back}>Back</button><button className="btn-primary" style={{flex:1}} onClick={next}>Continue →</button></div>
             </>
           )}
@@ -231,8 +231,8 @@ export default function OnboardingPage() {
             <>
               <div className="ob-label">Security setup</div>
               <h1 className="ob-heading">Your memory, protected.</h1>
-              <p className="ob-sub">Choose how Memori keeps you safe. You can change these any time in Settings.</p>
-              <div className="security-card"><div className="security-header"><div style={{flex:1}}><div className="security-title">🎙 Voice recognition</div><div className="security-desc">Memori learns your voice so only you can access memories via voice. Recorded locally, never sent to a server.</div></div><button className={`toggle ${voiceEnabled?"toggle-on":"toggle-off"}`} onClick={()=>setVoiceEnabled(v=>!v)} aria-label="Toggle voice security"/></div>{voiceEnabled && <div className="security-hint">Voice recognition will be set up on your first voice interaction.</div>}</div>
+              <p className="ob-sub">Choose how Seven keeps you safe. You can change these any time in Settings.</p>
+              <div className="security-card"><div className="security-header"><div style={{flex:1}}><div className="security-title">🎙 Voice recognition</div><div className="security-desc">Seven learns your voice so only you can access memories via voice. Recorded locally, never sent to a server.</div></div><button className={`toggle ${voiceEnabled?"toggle-on":"toggle-off"}`} onClick={()=>setVoiceEnabled(v=>!v)} aria-label="Toggle voice security"/></div>{voiceEnabled && <div className="security-hint">Voice recognition will be set up on your first voice interaction.</div>}</div>
               <div className="security-card"><div className="security-header"><div style={{flex:1}}><div className="security-title">🔔 Review reminders</div><div className="security-desc">Get notified when decisions are due for review. Keeps your memory accurate and accountable.</div></div><button className={`toggle ${notifEnabled?"toggle-on":"toggle-off"}`} onClick={()=>setNotifEnabled(v=>!v)} aria-label="Toggle reminders"/></div></div>
               <div className="guarantees">
                 <div className="guarantees-title">Our security guarantees</div>
@@ -249,10 +249,10 @@ export default function OnboardingPage() {
             <div className="done-center">
               <div className="done-check"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#1A5C32" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
               <h1 className="done-heading">You are all set</h1>
-              <p className="done-sub">Memori now knows who you are and is ready to start building your cognitive memory.</p>
+              <p className="done-sub">Seven now knows who you are and is ready to start building your cognitive memory.</p>
               {result && (<div className="done-stats"><div className="done-stat"><div className="done-stat-num">{result.raw}</div><div className="done-stat-label">facts stored</div></div><div className="done-stat"><div className="done-stat-num">{result.canonical}</div><div className="done-stat-label">canonical facts</div></div></div>)}
-              <div className="done-info"><strong>What happens next:</strong> Start a conversation with Memori. Every interaction deepens your memory. Log a decision and Memori will remind you to review it.</div>
-              <a href="/" className="done-link">Start talking to Memori →</a>
+              <div className="done-info"><strong>What happens next:</strong> Start a conversation with Seven. Every interaction deepens your memory. Log a decision and Seven will remind you to review it.</div>
+              <a href="/" className="done-link">Start talking to Seven →</a>
               <a href="/vault" className="done-secondary">View your memory vault</a>
             </div>
           )}

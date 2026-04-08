@@ -138,7 +138,7 @@ export default function DigestPage() {
               {/* Facts */}
               {data.facts.length > 0 && (
                 <div>
-                  <div style={{ fontSize:13, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#ABABAB", marginBottom:10 }}>What Memori learned</div>
+                  <div style={{ fontSize:13, fontWeight:600, letterSpacing:"0.08em", textTransform:"uppercase", color:"#ABABAB", marginBottom:10 }}>What Seven learned</div>
                   <div style={{ display:"grid", gap:8 }}>
                     {data.facts.map((f,i) => (
                       <div key={i} style={card}>

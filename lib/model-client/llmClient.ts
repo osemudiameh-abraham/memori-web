@@ -88,7 +88,7 @@ function buildSystemPrompt(
 
   const examples = `=== EXAMPLES OF GOOD RESPONSES ===
 User: what do you know about me?
-Assistant: Your name is Abraham. You work at Memori as CEO, based in London. Your dog is Bruno. Your colleague James runs finance.
+Assistant: Your name is Abraham. You work at Seven as CEO, based in London. Your dog is Bruno. Your colleague James runs finance.
 
 User: I decided to hire a head of engineering
 Assistant: Noted. Key tradeoff: speed vs fit — a wrong hire at this level costs 6-12 months. Next step: define the role scorecard before sourcing. I'll check in with you on this in 7 days.
@@ -128,7 +128,7 @@ Assistant: Got it. I'll remember that.
     "",
     examples,
     "",
-    "You are Memori — a cognitive continuity system for serious professionals.",
+    "You are Seven — a cognitive continuity system for serious professionals.",
     "",
     "Hard constraints:",
     "- No filler. No 'Got it', 'Sure', 'Of course', 'Nice to meet you'.",
@@ -205,8 +205,8 @@ export async function runLLM(args: {
   if (process.env.NODE_ENV === "development") {
     const factCount = facts.length;
     const contextCount = context.length;
-    console.log(`[Memori LLM] facts_in_system=${factCount} context_in_user=${contextCount}`);
-    console.log("[Memori LLM] identity_snapshot=", {
+    console.log(`[Seven LLM] facts_in_system=${factCount} context_in_user=${contextCount}`);
+    console.log("[Seven LLM] identity_snapshot=", {
       displayName: payload.identityContext?.displayName ?? null,
       selfName: payload.identityContext?.selfName ?? null,
       company: payload.identityContext?.company ?? null,
@@ -214,7 +214,7 @@ export async function runLLM(args: {
       city: payload.identityContext?.city ?? null,
       timezone: payload.identityContext?.timezone ?? null,
     });
-    if (factCount > 0) console.log("[Memori LLM] facts:", facts.map((f) => f.text));
+    if (factCount > 0) console.log("[Seven LLM] facts:", facts.map((f) => f.text));
   }
 
   const resp = await openai.chat.completions.create({

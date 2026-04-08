@@ -1,6 +1,6 @@
 // lib/cognition/selfImprove.ts
 // Weekly self-improvement loop
-// Analyses what Memori got wrong and surfaces improvement signals
+// Analyses what Seven got wrong and surfaces improvement signals
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -27,10 +27,10 @@ function getWeekStart(): string {
   return d.toISOString();
 }
 
-function estimateRecallAccuracy(traceCount: number, avgMemoriesUsed: number): number {
+function estimateRecallAccuracy(traceCount: number, avgSevenesUsed: number): number {
   if (traceCount === 0) return 0;
   // Heuristic: if avg memories used >= 3, recall is likely good
-  const base = Math.min(avgMemoriesUsed / 5, 1);
+  const base = Math.min(avgSevenesUsed / 5, 1);
   return Math.round(base * 100);
 }
 
@@ -84,15 +84,15 @@ export async function runSelfImprovementLoop(userId: string): Promise<SelfImprov
 
   const allTraces = traces ?? [];
   const traceCount = allTraces.length;
-  const totalMemories = allTraces.reduce((sum, t) => sum + (t.picked_memory_ids?.length ?? 0), 0);
-  const avgMemoriesUsed = traceCount > 0 ? totalMemories / traceCount : 0;
+  const totalSevenes = allTraces.reduce((sum, t) => sum + (t.picked_memory_ids?.length ?? 0), 0);
+  const avgSevenesUsed = traceCount > 0 ? totalSevenes / traceCount : 0;
 
-  if (traceCount > 0 && avgMemoriesUsed < 2) {
+  if (traceCount > 0 && avgSevenesUsed < 2) {
     signals.push({
       type: "recall_gap",
-      description: `Average of ${avgMemoriesUsed.toFixed(1)} memories used per response this week — lower than expected.`,
+      description: `Average of ${avgSevenesUsed.toFixed(1)} memories used per response this week — lower than expected.`,
       severity: "medium",
-      suggestion: "Share more context in your messages. The more specific you are, the better Memori can recall relevant information.",
+      suggestion: "Share more context in your messages. The more specific you are, the better Seven can recall relevant information.",
     });
   }
 
@@ -108,9 +108,9 @@ export async function runSelfImprovementLoop(userId: string): Promise<SelfImprov
     const types = [...new Set(singleMentionEntities.map(e => e.entity_type))];
     signals.push({
       type: "entity_missed",
-      description: `${singleMentionEntities.length} people or organisations mentioned only once — Memori may not know enough about them yet.`,
+      description: `${singleMentionEntities.length} people or organisations mentioned only once — Seven may not know enough about them yet.`,
       severity: "low",
-      suggestion: "Tell Memori more about the people and organisations that matter to your work. The more context it has, the better.",
+      suggestion: "Tell Seven more about the people and organisations that matter to your work. The more context it has, the better.",
     });
   }
 
@@ -130,12 +130,12 @@ export async function runSelfImprovementLoop(userId: string): Promise<SelfImprov
       type: "pattern_ignored",
       description: `${overdue.length} decisions are overdue for review.`,
       severity: "high",
-      suggestion: "Closing the loop on decisions is core to Memori's value. Visit the Reviews page to work through them.",
+      suggestion: "Closing the loop on decisions is core to Seven's value. Visit the Reviews page to work through them.",
     });
   }
 
   // Build summary
-  const recallAccuracy = estimateRecallAccuracy(traceCount, avgMemoriesUsed);
+  const recallAccuracy = estimateRecallAccuracy(traceCount, avgSevenesUsed);
   const highSignals = signals.filter(s => s.severity === "high").length;
   const missedTypes = [...new Set(singleMentionEntities.map(e => e.entity_type))];
 

@@ -5,7 +5,7 @@ import type {
   RhetoricalMode,
 } from "@/lib/preprocessing/types";
 
-export function pickRelevantMemories(
+export function pickRelevantSevenes(
   all: MemorySnippet[],
   userText: string,
   limit = 12

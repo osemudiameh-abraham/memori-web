@@ -142,8 +142,8 @@ export default function LoginPage() {
         <div className="form-panel">
           <div className="card">
             <div className="logo-row">
-              <img src="/memori-icon.png" alt="Memori" className="logo"/>
-              <span className="brand">Memori</span>
+              <img src="/memori-icon.png" alt="Seven" className="logo"/>
+              <span className="brand">Seven</span>
             </div>
 
             {mode === "sent" ? (
@@ -153,12 +153,12 @@ export default function LoginPage() {
                 <p className="sub" style={{animation:"none"}}>We sent a secure link to <strong>{email}</strong>.<br/>Click it to sign in.</p>
                 <div className="sent-success">Email sent successfully</div>
                 <button className="magic-btn" onClick={()=>setMode("signin")}>Use a different email</button>
-                <a href="/" className="back-home" style={{animation:"none"}}>← Back to Memori</a>
+                <a href="/" className="back-home" style={{animation:"none"}}>← Back to Seven</a>
               </div>
             ) : (
               <>
                 <h1 className="heading">{mode === "signup" ? "Create your account" : "Welcome back"}</h1>
-                <p className="sub">{mode === "signup" ? "Start building your cognitive memory." : "Sign in to continue with Memori."}</p>
+                <p className="sub">{mode === "signup" ? "Start building your cognitive memory." : "Sign in to continue with Seven."}</p>
 
                 {errorMsg && <div className="error-box">{errorMsg}</div>}
 
@@ -179,7 +179,7 @@ export default function LoginPage() {
                 <div className="mode-switch">
                   {mode==="signin"?(<>No account yet? <button className="mode-link" onClick={()=>{setMode("signup");setErrorMsg("");}}>Sign up</button></>):(<>Already have an account? <button className="mode-link" onClick={()=>{setMode("signin");setErrorMsg("");}}>Sign in</button></>)}
                 </div>
-                <a href="/" className="back-home">← Back to Memori</a>
+                <a href="/" className="back-home">← Back to Seven</a>
               </>
             )}
           </div>
@@ -187,7 +187,7 @@ export default function LoginPage() {
 
         <div className="trust-panel">
           <div className="trust-heading">Your memory. Your rules.</div>
-          <div className="trust-sub">Memori is built on the principle that you own everything stored about you.</div>
+          <div className="trust-sub">Seven is built on the principle that you own everything stored about you.</div>
           {[
             {icon:"🔒",label:"End-to-end encrypted",desc:"Your memories are encrypted at rest and in transit"},
             {icon:"👁",label:"You control your data",desc:"Export or delete everything at any time"},
@@ -200,7 +200,7 @@ export default function LoginPage() {
             </div>
           ))}
           <div className="memory-box">
-            <div className="memory-box-label">What Memori remembers</div>
+            <div className="memory-box-label">What Seven remembers</div>
             <div className="memory-box-text">Decisions you make. Facts about your life. Patterns in your thinking. Everything compounds over time, and you can correct, dispute, or delete any of it at any moment.</div>
           </div>
         </div>

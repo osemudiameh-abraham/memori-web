@@ -84,18 +84,18 @@ export async function GET(_req: NextRequest) {
       "my role is", "my city is", "i decided to test",
     ];
 
-    const userMemories = memories.filter(m => {
+    const userSevenes = memories.filter(m => {
       if (!m.text) return false;
       const lower = m.text.toLowerCase().trim();
       return !SYSTEM_PREFIXES.some(prefix => lower.startsWith(prefix));
     });
 
-    if (userMemories.length === 0) {
+    if (userSevenes.length === 0) {
       return NextResponse.json({ ok: true, reminder: null });
     }
 
     // Score and pick best
-    const ranked = userMemories
+    const ranked = userSevenes
       .map(m => ({
         ...m,
         score: scoreMemory(m),

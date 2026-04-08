@@ -115,7 +115,7 @@ export async function GET() {
 
   const summary =
     lines.join(" ") ||
-    "Memori does not know enough about you yet. Add more facts to build your identity summary.";
+    "Seven does not know enough about you yet. Add more facts to build your identity summary.";
 
   return NextResponse.json({
     ok: true,
