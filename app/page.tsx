@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { useDeepgramSTT } from "@/lib/voice/useDeepgramSTT";
+import { VoiceWave } from "@/components/VoiceWave";
 
 type ChatMessage = { role: "user" | "assistant"; text: string; approved?: "yes" | "no" };
 type ChatResponse = { ok: boolean; text?: string; error?: string };
@@ -66,6 +67,7 @@ export default function Page() {
   const [approving, setApproving] = useState<string | null>(null);
   const [gelParams, setGelParams] = useState<{ kind: string; params: Record<string, string | null> } | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -190,7 +192,7 @@ export default function Page() {
     }
   }, [messages]);
 
-  const { voiceState, start: startVoice, stop: stopVoice, isActive: voiceActive } = useDeepgramSTT({
+  const { voiceState, start: startVoice, stop: stopVoice, isActive: voiceActive, analyserNode, speakText } = useDeepgramSTT({
     onTranscript: (text) => { setVoiceError(null); void sendMessage(text); },
     onError: (msg) => { setVoiceError(msg); },
   });
@@ -244,7 +246,21 @@ export default function Page() {
     setApproving(null);
   }
 
-  function handleMicClick() { setVoiceError(null); if (voiceActive) stopVoice(); else startVoice(); }
+  function handleMicClick() {
+    setVoiceError(null);
+    if (voiceActive) {
+      stopVoice();
+      setVoiceMode(false);
+    } else {
+      setVoiceMode(true);
+      startVoice();
+    }
+  }
+  function exitVoiceMode() {
+    stopVoice();
+    setVoiceMode(false);
+    setVoiceError(null);
+  }
 
   async function signOut() { const supabase = createSupabaseBrowserClient(); await supabase.auth.signOut(); window.location.reload(); }
 
@@ -423,6 +439,32 @@ export default function Page() {
         @keyframes mspin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
         @keyframes mlistenpulse{0%,100%{opacity:1;}50%{opacity:0.5;}}
         @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:-200% 0;}}
+
+        /* ── Voice Mode Overlay — Gemini Live ── */
+        .voice-overlay{
+          position:fixed;inset:0;z-index:100;
+          background:#FFFFFF;
+          display:flex;flex-direction:column;
+          align-items:center;justify-content:center;
+          padding:0 24px 40px;
+          animation:gfade 0.2s ease both;
+        }
+        .voice-overlay-top{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:32px;width:100%;max-width:480px;}
+        .voice-status{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;color:#9AA0A6;letter-spacing:0.3px;text-transform:uppercase;}
+        .voice-status.listening{color:#1558D6;}
+        .voice-status.speaking{color:#34A853;}
+        .voice-transcript{width:100%;max-width:480px;max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:0 4px;}
+        .voice-transcript-user{text-align:right;font-size:15px;color:#1C1A18;font-family:'DM Sans',sans-serif;line-height:1.5;}
+        .voice-transcript-ai{text-align:left;font-size:15px;color:#1558D6;font-family:'DM Sans',sans-serif;line-height:1.5;}
+        .voice-stop-btn{
+          width:64px;height:64px;border-radius:50%;
+          background:#EA4335;border:none;cursor:pointer;
+          display:flex;align-items:center;justify-content:center;
+          color:white;box-shadow:0 4px 16px rgba(234,67,53,0.35);
+          transition:all 150ms ease;flex-shrink:0;
+          margin-top:32px;
+        }
+        .voice-stop-btn:hover{background:#C5221F;transform:scale(1.06);}
         .listening-wave{animation:mlistenpulse 1.2s ease infinite;}
       `}</style>
 
@@ -607,6 +649,35 @@ export default function Page() {
           </div>
         </main>
       </div>
+
+      {/* ━━━ GEMINI LIVE VOICE OVERLAY ━━━ */}
+      {voiceMode && (
+        <div className="voice-overlay">
+          <div className="voice-overlay-top">
+            <span className={`voice-status${voiceState === "listening" ? " listening" : voiceState === "speaking" ? " speaking" : ""}`}>
+              {voiceState === "listening" ? "Listening…" : voiceState === "speaking" ? "Speaking…" : voiceState === "processing" ? "Thinking…" : voiceState === "connecting" ? "Connecting…" : "Ready"}
+            </span>
+            <VoiceWave
+              isActive={voiceState === "listening" || voiceState === "speaking"}
+              analyserNode={analyserNode}
+              color="#1558D6"
+              width={320}
+              height={80}
+            />
+            <div className="voice-transcript">
+              {messages.slice(-3).map((m, i) => (
+                <div key={i} className={m.role === "user" ? "voice-transcript-user" : "voice-transcript-ai"}>
+                  {m.text.startsWith("__") ? "" : m.text.slice(0, 120)}
+                </div>
+              ))}
+            </div>
+          </div>
+          {voiceError && <div style={{fontSize:13,color:"#EA4335",marginBottom:8}}>{voiceError}</div>}
+          <button className="voice-stop-btn" onClick={exitVoiceMode} aria-label="Stop voice">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          </button>
+        </div>
+      )}
     </>
   );
 }

@@ -8,6 +8,7 @@ export type VoiceState =
   | "connecting"
   | "listening"
   | "processing"
+  | "speaking"
   | "error";
 
 type UseDeepgramSTTOptions = {
@@ -21,6 +22,8 @@ type UseDeepgramSTTReturn = {
   stop: () => void;
   isActive: boolean;
   errorMessage: string | null;
+  analyserNode: AnalyserNode | null;
+  speakText: (text: string) => Promise<void>;
 };
 
 export function useDeepgramSTT(
@@ -28,82 +31,113 @@ export function useDeepgramSTT(
 ): UseDeepgramSTTReturn {
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [analyserNode, setAnalyserNode] = useState<AnalyserNode | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const finalTranscriptRef = useRef<string>("");
   const stoppingRef = useRef<boolean>(false);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   const cleanup = useCallback(() => {
     stoppingRef.current = false;
-
     if (mediaRecorderRef.current) {
-      try {
-        if (mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-        }
-      } catch {}
+      try { if (mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop(); } catch {}
       mediaRecorderRef.current = null;
     }
-
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-
     if (wsRef.current) {
-      try {
-        wsRef.current.close();
-      } catch {}
+      try { wsRef.current.close(); } catch {}
       wsRef.current = null;
     }
-
     finalTranscriptRef.current = "";
   }, []);
 
   const stop = useCallback(() => {
     if (stoppingRef.current) return;
     stoppingRef.current = true;
-
     if (mediaRecorderRef.current) {
-      try {
-        if (mediaRecorderRef.current.state !== "inactive") {
-          mediaRecorderRef.current.stop();
-        }
-      } catch {}
+      try { if (mediaRecorderRef.current.state !== "inactive") mediaRecorderRef.current.stop(); } catch {}
     }
-
     if (wsRef.current) {
-      try {
-        // Send close message to Deepgram to flush final transcript
-        wsRef.current.send(JSON.stringify({ type: "CloseStream" }));
-      } catch {}
+      try { wsRef.current.send(JSON.stringify({ type: "CloseStream" })); } catch {}
     }
-
     setVoiceState("processing");
+  }, []);
+
+  const speakText = useCallback(async (text: string): Promise<void> => {
+    if (!text.trim()) return;
+    ttsAbortRef.current?.abort();
+    ttsAudioRef.current?.pause();
+    const controller = new AbortController();
+    ttsAbortRef.current = controller;
+    setVoiceState("speaking");
+    try {
+      const resp = await fetch("/api/voice/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+        signal: controller.signal,
+      });
+      if (!resp.ok || !resp.body) throw new Error("TTS failed");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+      const audioCtx = audioCtxRef.current;
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      setAnalyserNode(analyser);
+      const audio = new Audio(url);
+      ttsAudioRef.current = audio;
+      const source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      await new Promise<void>((resolve) => {
+        audio.onended = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.onerror = () => { URL.revokeObjectURL(url); resolve(); };
+        audio.play().catch(() => resolve());
+      });
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") return;
+    } finally {
+      if (!controller.signal.aborted) {
+        setVoiceState("idle");
+        setAnalyserNode(null);
+      }
+    }
   }, []);
 
   const start = useCallback(async () => {
     if (voiceState !== "idle" && voiceState !== "error") return;
-
     setErrorMessage(null);
     finalTranscriptRef.current = "";
     setVoiceState("requesting");
-
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
     } catch {
       setErrorMessage("Microphone access denied.");
-      options.onError?.("Microphone access denied.");
+      optionsRef.current.onError?.("Microphone access denied.");
       setVoiceState("error");
       return;
     }
-
+    if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+    const audioCtx = audioCtxRef.current;
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    const micSource = audioCtx.createMediaStreamSource(stream);
+    micSource.connect(analyser);
+    setAnalyserNode(analyser);
     setVoiceState("connecting");
-
     let key: string;
     try {
       const res = await fetch("/api/voice/token");
@@ -112,128 +146,70 @@ export function useDeepgramSTT(
       key = data.key;
     } catch (e) {
       cleanup();
+      setAnalyserNode(null);
       const msg = e instanceof Error ? e.message : "Could not connect to voice service";
       setErrorMessage(msg);
-      options.onError?.(msg);
+      optionsRef.current.onError?.(msg);
       setVoiceState("error");
       return;
     }
-
-    const wsUrl =
-      `wss://api.deepgram.com/v1/listen` +
-      `?model=nova-2` +
-      `&language=en` +
-      `&smart_format=true` +
-      `&interim_results=true` +
-      `&endpointing=500`;
-
+    const wsUrl = `wss://api.deepgram.com/v1/listen?model=nova-2&language=en&smart_format=true&interim_results=true&endpointing=500`;
     let ws: WebSocket;
     try {
       ws = new WebSocket(wsUrl, ["token", key]);
       wsRef.current = ws;
     } catch {
       cleanup();
+      setAnalyserNode(null);
       setErrorMessage("Could not open voice connection.");
-      options.onError?.("Could not open voice connection.");
+      optionsRef.current.onError?.("Could not open voice connection.");
       setVoiceState("error");
       return;
     }
-
     ws.onopen = () => {
       setVoiceState("listening");
-
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
-        : MediaRecorder.isTypeSupported("audio/webm")
-        ? "audio/webm"
-        : "";
-
-      const recorder = new MediaRecorder(
-        stream,
-        mimeType ? { mimeType } : undefined
-      );
+        : MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = recorder;
-
       recorder.ondataavailable = (e) => {
-        if (
-          e.data.size > 0 &&
-          wsRef.current?.readyState === WebSocket.OPEN
-        ) {
-          wsRef.current.send(e.data);
-        }
+        if (e.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.send(e.data);
       };
-
       recorder.start(250);
     };
-
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(String(event.data)) as {
-          type?: string;
-          is_final?: boolean;
-          channel?: {
-            alternatives?: { transcript?: string }[];
-          };
+          type?: string; is_final?: boolean;
+          channel?: { alternatives?: { transcript?: string }[] };
         };
-
         if (msg.type === "Results") {
-          const transcript =
-            msg.channel?.alternatives?.[0]?.transcript ?? "";
-
+          const transcript = msg.channel?.alternatives?.[0]?.transcript ?? "";
           if (msg.is_final && transcript.trim()) {
-            finalTranscriptRef.current =
-              (finalTranscriptRef.current + " " + transcript).trim();
+            finalTranscriptRef.current = (finalTranscriptRef.current + " " + transcript).trim();
           }
-        }
-
-        if (msg.type === "Metadata" || msg.type === "SpeechStarted") {
-          // ignore
-        }
-
-        if (
-          msg.type === "Results" &&
-          (event.data as string).includes('"speech_final":true')
-        ) {
-          // speech_final means Deepgram detected end of utterance
-          // We will let the user stop manually for now
         }
       } catch {}
     };
-
     ws.onerror = () => {
-      cleanup();
+      cleanup(); setAnalyserNode(null);
       setErrorMessage("Voice connection error.");
-      options.onError?.("Voice connection error.");
+      optionsRef.current.onError?.("Voice connection error.");
       setVoiceState("error");
     };
-
     ws.onclose = () => {
       const transcript = finalTranscriptRef.current.trim();
-      cleanup();
-
-      if (transcript) {
-        options.onTranscript(transcript);
-        setVoiceState("idle");
-      } else if (stoppingRef.current) {
-        setVoiceState("idle");
-      } else {
-        setVoiceState("idle");
-      }
+      cleanup(); setAnalyserNode(null);
+      if (transcript) optionsRef.current.onTranscript(transcript);
+      setVoiceState("idle");
     };
-  }, [voiceState, cleanup, options]);
+  }, [voiceState, cleanup]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
+  useEffect(() => { return () => { cleanup(); }; }, [cleanup]);
 
-  const isActive =
-    voiceState === "requesting" ||
-    voiceState === "connecting" ||
-    voiceState === "listening" ||
-    voiceState === "processing";
+  const isActive = voiceState === "requesting" || voiceState === "connecting" ||
+    voiceState === "listening" || voiceState === "processing" || voiceState === "speaking";
 
-  return { voiceState, start, stop, isActive, errorMessage };
+  return { voiceState, start, stop, isActive, errorMessage, analyserNode, speakText };
 }
