@@ -1,242 +1,231 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AppShell from "@/components/AppShell";
 
-type Fact = { id: string; fact_key: string; subject: string; attribute: string; value_text: string; canonical_text: string; status: string; };
-type FactsResponse = { ok: true; facts: Fact[] } | { ok: false; error: string };
-type UpdateStatusResponse = { ok: true; fact: { id: string; fact_key: string; canonical_text: string; previous_status: string; next_status: string } } | { ok: false; error: string };
-type Entity = { text: string; type: string; occurrence_count: number };
-type EntitiesResponse = { ok: true; entities: Entity[] } | { ok: false; error: string };
-
-const STATUS_COLORS: Record<string, { bg: string; border: string; text: string; dot: string }> = {
-  active:     { bg: "rgba(220,245,230,0.70)", border: "rgba(30,140,70,0.18)",  text: "#1A5C32", dot: "#2A9C52" },
-  disputed:   { bg: "rgba(255,243,220,0.70)", border: "rgba(185,140,30,0.20)", text: "#6A4A00", dot: "#D4900A" },
-  historical: { bg: "rgba(240,240,250,0.70)", border: "rgba(100,100,180,0.18)",text: "#2A2870", dot: "#5A58B0" },
-  superseded: { bg: "rgba(245,240,240,0.70)", border: "rgba(160,100,100,0.18)",text: "#5A2020", dot: "#B05050" },
-};
-
-const ENTITY_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  person:  { bg: "rgba(228,240,255,0.80)", border: "rgba(80,130,200,0.20)", text: "#1A3A70" },
-  company: { bg: "rgba(235,250,240,0.80)", border: "rgba(40,160,80,0.18)",  text: "#1A5C32" },
-  place:   { bg: "rgba(255,248,228,0.80)", border: "rgba(185,145,30,0.18)", text: "#5A3A00" },
-  project: { bg: "rgba(245,235,255,0.80)", border: "rgba(130,80,200,0.18)", text: "#3A1A70" },
-};
-
-function FactCard({ fact, onRefresh }: { fact: Fact; onRefresh: () => void }) {
-  const [loading, setLoading] = useState(false);
-  const s = STATUS_COLORS[fact.status] ?? STATUS_COLORS.historical;
-
-  async function handle(nextStatus: "disputed" | "active" | "historical") {
-    if (loading) return;
-    setLoading(true);
-    try {
-      const res = await fetch("/api/facts/update-status", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ factId: fact.id, nextStatus, note: "" }) });
-      const json = (await res.json().catch(() => ({}))) as UpdateStatusResponse;
-      if (!res.ok || json.ok === false) { alert(json.ok === false ? json.error : "Update failed"); return; }
-      onRefresh();
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : "Failed"); }
-    finally { setLoading(false); }
-  }
-
-  function btnStyle(color: string, bg: string, border: string): React.CSSProperties {
-    return { padding:"6px 12px", borderRadius:9, border:`1px solid ${border}`, background:bg, color, fontSize:12.5, fontWeight:500, cursor:"pointer", fontFamily:"'DM Sans',sans-serif", transition:"all 130ms ease" };
-  }
-
-  return (
-    <div style={{ background:"rgba(255,255,255,0.90)", border:"1px solid rgba(0,0,0,0.08)", borderRadius:14, padding:"16px 18px", boxShadow:"0 1px 6px rgba(0,0,0,0.05)" }}>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:12, marginBottom:10 }}>
-        <div style={{ fontWeight:500, fontSize:14, color:"#1C1A18", letterSpacing:"-0.1px" }}>{fact.fact_key}</div>
-        <span style={{ display:"inline-flex", alignItems:"center", gap:5, padding:"3px 9px", borderRadius:100, fontSize:11, fontWeight:600, letterSpacing:"0.07em", background:s.bg, border:`1px solid ${s.border}`, color:s.text, whiteSpace:"nowrap", flexShrink:0 }}>
-          <span style={{ width:5, height:5, borderRadius:"50%", background:s.dot, display:"inline-block" }}/>
-          {fact.status}
-        </span>
-      </div>
-      <div style={{ fontSize:16, color:"#1C1A18", marginBottom:6, lineHeight:1.5 }}>{fact.value_text}</div>
-      <div style={{ fontSize:12.5, color:"#8A8785", lineHeight:1.55 }}>{fact.canonical_text}</div>
-      <div style={{ display:"flex", gap:8, marginTop:14, flexWrap:"wrap" }}>
-        {fact.status !== "disputed"   && <button onClick={() => handle("disputed")}   disabled={loading} style={btnStyle("#7A5500","rgba(180,140,0,0.08)","rgba(180,140,0,0.20)")}>{loading?"…":"Mark disputed"}</button>}
-        {fact.status !== "active"     && <button onClick={() => handle("active")}     disabled={loading} style={btnStyle("#1A5C32","rgba(20,140,60,0.08)","rgba(20,140,60,0.20)")}>{loading?"…":"Restore active"}</button>}
-        {fact.status !== "historical" && <button onClick={() => handle("historical")} disabled={loading} style={btnStyle("#2A2870","rgba(80,80,180,0.08)","rgba(80,80,180,0.20)")}>{loading?"…":"Mark historical"}</button>}
-      </div>
-    </div>
-  );
+interface Fact {
+  id: string;
+  fact_key: string;
+  subject: string;
+  attribute: string;
+  value_text: string;
+  canonical_text: string;
+  status: string;
+  category?: string;
 }
 
-function Section({ title, facts, onRefresh, icon }: { title: string; facts: Fact[]; onRefresh: () => void; icon: string }) {
-  if (facts.length === 0) return null;
-  return (
-    <div style={{ marginBottom:28 }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-        <span style={{ fontSize:14 }}>{icon}</span>
-        <h2 style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825", letterSpacing:"-0.1px" }}>{title}</h2>
-        <span style={{ fontSize:12, color:"#ABABAB", background:"rgba(0,0,0,0.05)", borderRadius:100, padding:"1px 8px" }}>{facts.length}</span>
-      </div>
-      <div style={{ display:"grid", gap:10 }}>
-        {facts.map(f => <FactCard key={f.id} fact={f} onRefresh={onRefresh}/>)}
-      </div>
-    </div>
-  );
+interface IdentitySummary {
+  name?: string;
+  firstName?: string;
+  summary?: string;
+  role?: string;
+  company?: string;
+  city?: string;
 }
 
-function EntityPill({ entity }: { entity: Entity }) {
-  const c = ENTITY_COLORS[entity.type] ?? ENTITY_COLORS.person;
-  return (
-    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:12, padding:"10px 14px", borderRadius:11, background:c.bg, border:`1px solid ${c.border}` }}>
-      <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-        <span style={{ fontSize:13, fontWeight:500, color:c.text }}>{entity.text}</span>
-        <span style={{ fontSize:11, color:c.text, opacity:0.65, textTransform:"uppercase" as const, letterSpacing:"0.07em", fontWeight:600 }}>{entity.type}</span>
-      </div>
-      <span style={{ fontSize:12, color:c.text, opacity:0.70, flexShrink:0 }}>
-        {entity.occurrence_count}×
-      </span>
-    </div>
-  );
+const CATEGORY_ICONS: Record<string, string> = {
+  work: "💼",
+  personal: "👤",
+  relationships: "🤝",
+  decisions: "🎯",
+  default: "🧠",
+};
+
+const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
+  active:     { bg: "rgba(52,168,83,0.1)",  color: "var(--green)" },
+  disputed:   { bg: "rgba(251,188,4,0.1)",  color: "#a06000" },
+  historical: { bg: "rgba(66,133,244,0.1)", color: "var(--blue)" },
+  superseded: { bg: "rgba(234,67,53,0.1)",  color: "var(--red)" },
+};
+
+function groupByCategory(facts: Fact[]): Record<string, Fact[]> {
+  const groups: Record<string, Fact[]> = {};
+  for (const f of facts) {
+    const cat = f.category ?? inferCategory(f);
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(f);
+  }
+  return groups;
+}
+
+function inferCategory(f: Fact): string {
+  const key = (f.fact_key ?? "").toLowerCase();
+  const attr = (f.attribute ?? "").toLowerCase();
+  if (key.includes("work") || attr.includes("role") || attr.includes("company") || attr.includes("job")) return "work";
+  if (key.includes("person") || attr.includes("name") || attr.includes("city") || attr.includes("age")) return "personal";
+  if (key.includes("relation") || attr.includes("friend") || attr.includes("partner")) return "relationships";
+  if (key.includes("decision")) return "decisions";
+  return "personal";
 }
 
 export default function VaultPage() {
   const [facts, setFacts] = useState<Fact[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [entities, setEntities] = useState<Entity[]>([]);
-  const [entitiesLoading, setEntitiesLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"facts" | "entities">("facts");
+  const [identity, setIdentity] = useState<IdentitySummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
-  async function load() {
-    setLoading(true); setError("");
-    try {
-      const res = await fetch("/api/facts?include_evidence=0", { credentials:"include" });
-      const data = (await res.json().catch(() => ({}))) as FactsResponse;
-      if (!res.ok || data.ok === false) { setError((data as {error?:string}).error ?? "Failed to load"); return; }
-      setFacts(data.ok ? data.facts : []);
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed to load"); }
-    finally { setLoading(false); }
-  }
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [idRes, factsRes] = await Promise.all([
+          fetch("/api/identity-summary", { credentials: "include" }),
+          fetch("/api/vault/facts", { credentials: "include" }),
+        ]);
+        if (idRes.ok) setIdentity(await idRes.json() as IdentitySummary);
+        if (factsRes.ok) {
+          const d = await factsRes.json() as { facts?: Fact[] };
+          setFacts(d.facts ?? []);
+        }
+      } catch {}
+      setLoading(false);
+    })();
+  }, []);
 
-  async function loadEntities() {
-    setEntitiesLoading(true);
-    try {
-      const res = await fetch("/api/entities", { credentials:"include" });
-      const data = (await res.json().catch(() => ({}))) as EntitiesResponse;
-      setEntities(data.ok ? data.entities : []);
-    } catch { setEntities([]); }
-    finally { setEntitiesLoading(false); }
-  }
+  const filtered = facts.filter(f =>
+    search === "" ||
+    f.canonical_text?.toLowerCase().includes(search.toLowerCase()) ||
+    f.attribute?.toLowerCase().includes(search.toLowerCase())
+  );
 
-  useEffect(() => { void load(); void loadEntities(); }, []);
-
-  const active = facts.filter(f => f.status === "active");
-  const disputed = facts.filter(f => f.status === "disputed");
-  const historical = facts.filter(f => f.status === "historical");
-  const superseded = facts.filter(f => f.status === "superseded");
-
-  const persons = entities.filter(e => e.type === "person");
-  const companies = entities.filter(e => e.type === "company");
-  const other = entities.filter(e => e.type !== "person" && e.type !== "company");
-
-  const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding:"7px 16px", borderRadius:9, border:"none", cursor:"pointer",
-    fontFamily:"'DM Sans',sans-serif", fontSize:13.5, fontWeight:500,
-    background: active ? "#1C1A18" : "transparent",
-    color: active ? "#FAF9F5" : "#6B6865",
-    transition:"all 130ms ease",
-  });
+  const grouped = groupByCategory(filtered);
+  const categories = Object.keys(grouped).sort();
 
   return (
-    <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}html,body{height:100%;font-family:'DM Sans',-apple-system,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF9F5;color:#1C1A18;}`}</style>
-      <div style={{ minHeight:"100vh", background:"radial-gradient(ellipse 80% 60% at 50% -10%,rgba(255,255,255,0.98) 0%,transparent 60%),#F5F4F0" }}>
-        {/* Topbar */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"16px 24px", borderBottom:"1px solid rgba(0,0,0,0.07)", background:"rgba(245,244,240,0.80)", backdropFilter:"blur(20px)", position:"sticky", top:0, zIndex:10 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-            <a href="/" style={{ display:"flex", alignItems:"center", gap:6, padding:"7px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)", color:"#3C3A38", fontSize:13.5, textDecoration:"none" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>Home
-            </a>
-            <span style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825" }}>Memory Vault</span>
-          </div>
-          <div style={{ display:"flex", gap:8 }}>
-            <a href="/facts" style={{ padding:"7px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)", color:"#3C3A38", fontSize:13.5, textDecoration:"none" }}>Facts audit</a>
-            <button onClick={() => { void load(); void loadEntities(); }} disabled={loading} style={{ padding:"7px 12px", borderRadius:9, border:"1px solid rgba(0,0,0,0.12)", background:"rgba(255,255,255,0.70)", color:"#3C3A38", fontSize:13.5, cursor:"pointer", fontFamily:"inherit" }}>{loading?"Loading…":"Refresh"}</button>
-          </div>
+    <AppShell>
+      <div style={{ flex: 1, padding: "40px 32px", maxWidth: 720, margin: "0 auto", width: "100%" }}>
+        {/* Header */}
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ fontSize: 28, fontWeight: 500, color: "var(--text-primary)", marginBottom: 4 }}>
+            Memory Vault
+          </h1>
+          <p style={{ fontSize: 14, color: "var(--text-muted)" }}>
+            Everything Seven knows about you.
+          </p>
         </div>
 
-        <div style={{ maxWidth:680, margin:"0 auto", padding:"28px 24px 60px" }}>
-          <p style={{ fontSize:14, color:"#8A8785", marginBottom:20, lineHeight:1.55 }}>Everything Seven knows about you — facts, people, and organisations extracted from your conversations.</p>
-
-          {error && <div style={{ padding:"12px 16px", borderRadius:12, background:"rgba(255,240,240,0.95)", border:"1px solid rgba(185,60,60,0.18)", color:"#6A1A1A", fontSize:14, marginBottom:20 }}>{error}</div>}
-
-          {/* Tab switcher */}
-          <div style={{ display:"flex", gap:4, marginBottom:24, padding:"4px", borderRadius:11, background:"rgba(0,0,0,0.05)", width:"fit-content" }}>
-            <button style={tabStyle(activeTab === "facts")} onClick={() => setActiveTab("facts")}>
-              Facts {active.length > 0 && `(${active.length})`}
-            </button>
-            <button style={tabStyle(activeTab === "entities")} onClick={() => setActiveTab("entities")}>
-              People & Orgs {entities.length > 0 && `(${entities.length})`}
-            </button>
+        {/* Identity summary card */}
+        {identity && (
+          <div style={{
+            background: "var(--surface)",
+            borderRadius: "var(--radius-card)",
+            boxShadow: "var(--shadow-card)",
+            padding: "24px",
+            marginBottom: 28,
+            display: "flex", gap: 16, alignItems: "flex-start",
+          }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: "var(--blue)", color: "#fff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 22, fontWeight: 600, flexShrink: 0,
+            }}>
+              {(identity.firstName ?? identity.name ?? "?").charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p style={{ fontSize: 17, fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+                {identity.firstName ?? identity.name ?? "You"}
+              </p>
+              {(identity.role || identity.company) && (
+                <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 6 }}>
+                  {[identity.role, identity.company].filter(Boolean).join(" · ")}
+                </p>
+              )}
+              {identity.summary && (
+                <p style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                  {identity.summary}
+                </p>
+              )}
+            </div>
           </div>
+        )}
 
-          {/* Facts tab */}
-          {activeTab === "facts" && (
-            loading && !facts.length ? <div style={{ textAlign:"center", padding:40, color:"#8A8785", fontSize:14 }}>Loading…</div> : (
-              <>
-                <Section title="Active facts" facts={active} onRefresh={load} icon="✦"/>
-                <Section title="Disputed" facts={disputed} onRefresh={load} icon="⚑"/>
-                <Section title="Historical" facts={historical} onRefresh={load} icon="◷"/>
-                <Section title="Superseded" facts={superseded} onRefresh={load} icon="↺"/>
-                {!facts.length && <div style={{ textAlign:"center", padding:40, color:"#8A8785", fontSize:14 }}>No facts stored yet. Start a conversation to build your memory.</div>}
-              </>
-            )
-          )}
+        {/* Search */}
+        <div style={{ marginBottom: 24, position: "relative" }}>
+          <input
+            type="text"
+            placeholder="Search your memories…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{
+              width: "100%",
+              border: "1px solid rgba(0,0,0,0.12)",
+              borderRadius: "var(--radius-pill)",
+              padding: "11px 18px",
+              fontSize: 14, color: "var(--text-primary)",
+              outline: "none", background: "var(--surface)",
+              transition: "border-color var(--transition)",
+            }}
+            onFocus={e => (e.currentTarget.style.borderColor = "var(--blue)")}
+            onBlur={e => (e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)")}
+          />
+        </div>
 
-          {/* Entities tab */}
-          {activeTab === "entities" && (
-            entitiesLoading ? <div style={{ textAlign:"center", padding:40, color:"#8A8785", fontSize:14 }}>Loading…</div> : entities.length === 0 ? (
-              <div style={{ textAlign:"center", padding:"48px 24px", background:"rgba(255,255,255,0.80)", borderRadius:16, border:"1px solid rgba(0,0,0,0.08)" }}>
-                <div style={{ fontSize:32, marginBottom:16 }}>🕸</div>
-                <div style={{ fontFamily:"'Lora',Georgia,serif", fontSize:18, color:"#2A2825", marginBottom:8 }}>No entities yet</div>
-                <div style={{ fontSize:14, color:"#8A8785", lineHeight:1.58 }}>As you chat with Seven and mention people, companies, and places, they will appear here automatically.</div>
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: "80px 0" }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: "50%",
+              border: "3px solid rgba(0,0,0,0.1)",
+              borderTopColor: "var(--blue)",
+              animation: "spin 0.8s linear infinite",
+            }} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{
+            background: "var(--surface)", borderRadius: "var(--radius-card)",
+            boxShadow: "var(--shadow-card)", padding: "48px 32px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
+            <p style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>
+              {search ? "No matches found" : "Vault is empty"}
+            </p>
+            <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+              {search ? "Try a different search term." : "Start chatting with Seven and your memories will appear here."}
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
+            {categories.map(cat => (
+              <div key={cat}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 18 }}>{CATEGORY_ICONS[cat] ?? CATEGORY_ICONS.default}</span>
+                  <h2 style={{ fontSize: 15, fontWeight: 600, color: "var(--text-primary)", textTransform: "capitalize" }}>{cat}</h2>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", background: "rgba(0,0,0,0.06)", borderRadius: "var(--radius-pill)", padding: "2px 8px" }}>
+                    {grouped[cat].length}
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {grouped[cat].map(fact => {
+                    const sc = STATUS_COLORS[fact.status] ?? STATUS_COLORS.active;
+                    return (
+                      <div key={fact.id} style={{
+                        background: "var(--surface)",
+                        borderRadius: 14,
+                        boxShadow: "0 1px 3px rgba(60,64,67,0.1)",
+                        padding: "14px 16px",
+                        display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
+                      }}>
+                        <p style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.6, flex: 1 }}>
+                          {fact.canonical_text}
+                        </p>
+                        <span style={{
+                          fontSize: 11, fontWeight: 600,
+                          background: sc.bg, color: sc.color,
+                          borderRadius: "var(--radius-pill)",
+                          padding: "3px 10px", flexShrink: 0, textTransform: "capitalize",
+                        }}>
+                          {fact.status}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            ) : (
-              <>
-                {persons.length > 0 && (
-                  <div style={{ marginBottom:24 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                      <span style={{ fontSize:14 }}>👤</span>
-                      <h2 style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825" }}>People</h2>
-                      <span style={{ fontSize:12, color:"#ABABAB", background:"rgba(0,0,0,0.05)", borderRadius:100, padding:"1px 8px" }}>{persons.length}</span>
-                    </div>
-                    <div style={{ display:"grid", gap:8 }}>
-                      {persons.map(e => <EntityPill key={`${e.text}-${e.type}`} entity={e}/>)}
-                    </div>
-                  </div>
-                )}
-                {companies.length > 0 && (
-                  <div style={{ marginBottom:24 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                      <span style={{ fontSize:14 }}>🏢</span>
-                      <h2 style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825" }}>Organisations</h2>
-                      <span style={{ fontSize:12, color:"#ABABAB", background:"rgba(0,0,0,0.05)", borderRadius:100, padding:"1px 8px" }}>{companies.length}</span>
-                    </div>
-                    <div style={{ display:"grid", gap:8 }}>
-                      {companies.map(e => <EntityPill key={`${e.text}-${e.type}`} entity={e}/>)}
-                    </div>
-                  </div>
-                )}
-                {other.length > 0 && (
-                  <div style={{ marginBottom:24 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
-                      <span style={{ fontSize:14 }}>◈</span>
-                      <h2 style={{ fontFamily:"'Lora',Georgia,serif", fontSize:17, fontWeight:500, color:"#2A2825" }}>Other</h2>
-                    </div>
-                    <div style={{ display:"grid", gap:8 }}>
-                      {other.map(e => <EntityPill key={`${e.text}-${e.type}`} entity={e}/>)}
-                    </div>
-                  </div>
-                )}
-              </>
-            )
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
-    </>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </AppShell>
   );
 }

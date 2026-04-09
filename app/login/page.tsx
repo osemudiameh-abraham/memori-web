@@ -3,208 +3,192 @@
 import { useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-type Mode = "signin" | "signup" | "sent";
+const StarLogo = () => (
+  <svg width="56" height="56" viewBox="0 0 100 100" fill="none">
+    <path d="M50 5C50 5 54 35 70 50C54 65 50 95 50 95C50 95 46 65 30 50C46 35 50 5 50 5Z" fill="#1558D6"/>
+    <path d="M5 50C5 50 35 46 50 30C65 46 95 50 95 50C95 50 65 54 50 70C35 54 5 50 5 50Z" fill="#4285F4"/>
+  </svg>
+);
+
+const GoogleIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 48 48">
+    <path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.6 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.4 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/>
+    <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.4 6.1 29.5 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+    <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.3 35.3 26.8 36 24 36c-5.3 0-9.7-3.4-11.3-8H6.4C9.7 35.6 16.3 44 24 44z"/>
+    <path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.2 5.2C42.7 36.4 44 31.1 44 24c0-1.3-.1-2.6-.4-3.9z"/>
+  </svg>
+);
+
+type Mode = "idle" | "sending" | "sent" | "error";
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [status, setStatus] = useState<"idle"|"busy"|"error">("idle");
+  const [mode, setMode] = useState<Mode>("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const [showPass, setShowPass] = useState(false);
 
-  async function handleEmailAuth() {
+  const supabase = createSupabaseBrowserClient();
+
+  const handleGoogle = async () => {
+    setMode("sending");
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    if (error) { setErrorMsg(error.message); setMode("error"); }
+  };
+
+  const handleMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
     const t = email.trim();
-    if (!t || !password) { setErrorMsg("Please enter your email and password."); setStatus("error"); return; }
-    setStatus("busy"); setErrorMsg("");
-    const supabase = createSupabaseBrowserClient();
-    if (mode === "signup") {
-      const { error } = await supabase.auth.signUp({ email: t, password, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
-      if (error) { setErrorMsg(error.message); setStatus("error"); return; }
-      setMode("sent");
-    } else {
-      const { data: signInData, error } = await supabase.auth.signInWithPassword({ email: t, password });
-      if (error) { setErrorMsg(error.message); setStatus("error"); return; }
-      if (signInData?.user) {
-        const { data: profile } = await supabase.from("identity_profiles").select("id").eq("user_id", signInData.user.id).maybeSingle();
-        window.location.href = profile ? "/" : "/onboarding";
-      } else {
-        window.location.href = "/";
-      }
-    }
-    setStatus("idle");
-  }
-
-  async function handleMagicLink() {
-    const t = email.trim();
-    if (!t) { setErrorMsg("Please enter your email."); setStatus("error"); return; }
-    setStatus("busy"); setErrorMsg("");
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOtp({ email: t, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
-    if (error) { setErrorMsg(error.message); setStatus("error"); return; }
-    setMode("sent"); setStatus("idle");
-  }
-
-  async function handleGoogle() {
-    setStatus("busy"); setErrorMsg("");
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${window.location.origin}/auth/callback` } });
-    if (error) { setErrorMsg(error.message); setStatus("error"); }
-  }
-
-  function handleKey(e: React.KeyboardEvent) {
-    if (e.key === "Enter") void handleEmailAuth();
-  }
+    if (!t) { setErrorMsg("Please enter your email."); setMode("error"); return; }
+    setMode("sending"); setErrorMsg("");
+    const { error } = await supabase.auth.signInWithOtp({
+      email: t,
+      options: { emailRedirectTo: `${window.location.origin}/` },
+    });
+    if (error) { setErrorMsg(error.message); setMode("error"); }
+    else setMode("sent");
+  };
 
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
-        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-        html,body{min-height:100%;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-font-smoothing:antialiased;background:#FAF9F5;color:#1C1A18;}
+    <div style={{
+      minHeight: "100vh",
+      background: "var(--bg)",
+      display: "flex",
+      fontFamily: "var(--font)",
+    }}>
+      {/* Left panel */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "48px",
+      }}
+      className="hidden md:flex"
+      >
+        <StarLogo />
+        <div style={{ height: 24 }} />
+        <h1 style={{ fontSize: 40, fontWeight: 600, color: "var(--text-primary)", marginBottom: 12 }}>Seven</h1>
+        <p style={{ fontSize: 18, color: "var(--text-secondary)", textAlign: "center", maxWidth: 280, lineHeight: 1.5 }}>
+          The AI that never forgets you
+        </p>
+      </div>
 
-        .root{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;background:#FAF9F5;}
-        @media(max-width:820px){.root{grid-template-columns:1fr;}.trust-panel{display:none!important;}}
+      {/* Right panel */}
+      <div style={{
+        flex: 1,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px 24px",
+      }}>
+        <div style={{
+          background: "var(--surface)",
+          borderRadius: "var(--radius-card)",
+          boxShadow: "var(--shadow-card)",
+          padding: "48px 40px",
+          width: "100%",
+          maxWidth: 400,
+        }}>
+          {/* Mobile logo */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 32, justifyContent: "center" }} className="flex md:hidden">
+            <StarLogo />
+            <span style={{ fontSize: 24, fontWeight: 600, color: "var(--text-primary)" }}>Seven</span>
+          </div>
 
-        .form-panel{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 40px;min-height:100vh;position:relative;overflow:hidden;}
-        .form-panel::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(91,168,216,0.06) 0%,transparent 65%);pointer-events:none;animation:glowPulse 6s ease-in-out infinite;}
-        @media(max-width:820px){.form-panel{padding:40px 24px;}}
+          <h2 style={{ fontSize: 24, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>
+            Welcome back
+          </h2>
+          <p style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 32 }}>
+            Sign in to continue with Seven
+          </p>
 
-        .card{width:100%;max-width:400px;position:relative;z-index:1;animation:cardEnter 0.5s cubic-bezier(0.16,1,0.3,1) both;}
-        .logo-row{display:flex;align-items:center;gap:11px;margin-bottom:40px;animation:fadeUp 0.4s ease 0.06s both;}
-        .logo{width:36px;height:36px;flex-shrink:0;object-fit:contain;}
-        .brand{font-family:'Lora',Georgia,serif;font-size:20px;font-weight:500;color:#1C1A18;letter-spacing:-0.2px;}
-
-        .heading{font-family:'Lora',Georgia,serif;font-size:28px;font-weight:400;color:#1C1A18;letter-spacing:-0.4px;margin-bottom:6px;line-height:1.2;animation:fadeUp 0.4s ease 0.10s both;}
-        .sub{font-size:15px;color:#8A8785;line-height:1.55;margin-bottom:32px;animation:fadeUp 0.4s ease 0.14s both;}
-
-        .google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:13px 16px;border-radius:12px;border:1px solid rgba(0,0,0,0.10);background:#FFFFFF;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;color:#1C1A18;cursor:pointer;transition:all 180ms ease;margin-bottom:20px;box-shadow:0 1px 3px rgba(0,0,0,0.04);animation:fadeUp 0.4s ease 0.18s both;}
-        .google-btn:hover:not(:disabled){border-color:rgba(0,0,0,0.18);box-shadow:0 2px 12px rgba(0,0,0,0.08);transform:translateY(-1px);}
-        .google-btn:active{transform:translateY(0);}.google-btn:disabled{opacity:0.55;cursor:not-allowed;transform:none;}
-
-        .divider{display:flex;align-items:center;gap:16px;margin-bottom:22px;animation:fadeUp 0.4s ease 0.22s both;}
-        .divider::before,.divider::after{content:'';flex:1;height:1px;background:rgba(0,0,0,0.07);}
-        .divider span{font-size:12px;color:#C0BDB8;font-weight:500;letter-spacing:0.4px;text-transform:uppercase;}
-
-        .field-label{font-size:13px;font-weight:500;color:#4A4845;margin-bottom:5px;display:block;}
-        .field-wrap{position:relative;margin-bottom:14px;}
-        .field-input{width:100%;padding:12px 16px;border-radius:12px;border:1px solid rgba(0,0,0,0.10);background:#FAFAF8;font-family:'DM Sans',sans-serif;font-size:15px;color:#1C1A18;transition:all 180ms ease;outline:none;-webkit-appearance:none;}
-        .field-input:focus{background:#FFFFFF;border-color:rgba(91,168,216,0.40);box-shadow:0 0 0 3px rgba(91,168,216,0.08);}
-        .field-input::placeholder{color:#C0BDB8;font-weight:300;}
-        .pass-toggle{position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#AEABA5;font-size:13px;font-family:'DM Sans',sans-serif;padding:4px;transition:color 130ms ease;}
-        .pass-toggle:hover{color:#1C1A18;}
-        .form-fields{animation:fadeUp 0.4s ease 0.26s both;}
-
-        .primary-btn{width:100%;padding:13px 16px;border-radius:12px;border:none;background:#1C1A18;color:#FAFAF8;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:500;cursor:pointer;transition:all 180ms ease;margin-top:4px;}
-        .primary-btn:hover:not(:disabled){background:#2E2C2A;transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,0.16);}
-        .primary-btn:active{transform:translateY(0);}.primary-btn:disabled{opacity:0.50;cursor:not-allowed;transform:none;}
-
-        .magic-btn{width:100%;padding:12px 16px;border-radius:12px;border:1px solid rgba(0,0,0,0.08);background:transparent;color:#6B6865;font-family:'DM Sans',sans-serif;font-size:14px;cursor:pointer;transition:all 160ms ease;margin-top:10px;}
-        .magic-btn:hover{background:#FAFAF8;border-color:rgba(0,0,0,0.14);color:#1C1A18;}
-        .magic-btn:disabled{opacity:0.50;cursor:not-allowed;}
-
-        .error-box{padding:12px 16px;border-radius:11px;background:rgba(255,240,240,0.90);border:1px solid rgba(200,80,80,0.14);color:#8B2020;font-size:13.5px;margin-bottom:16px;line-height:1.5;animation:fadeUp 0.3s ease both;}
-
-        .mode-switch{text-align:center;margin-top:24px;font-size:13.5px;color:#8A8785;animation:fadeUp 0.4s ease 0.34s both;}
-        .mode-link{color:#1C1A18;font-weight:600;cursor:pointer;text-decoration:none;background:none;border:none;font-family:inherit;font-size:inherit;border-bottom:1px solid rgba(0,0,0,0.2);padding-bottom:1px;transition:border-color 130ms ease;}
-        .mode-link:hover{border-color:rgba(0,0,0,0.6);}
-
-        .back-home{display:block;text-align:center;margin-top:18px;font-size:13.5px;color:#C0BDB8;text-decoration:none;transition:color 130ms ease;animation:fadeUp 0.4s ease 0.38s both;}
-        .back-home:hover{color:#6B6865;}
-
-        .sent-box{text-align:center;padding:16px 0;animation:fadeUp 0.4s ease both;}
-        .sent-icon-wrap{width:56px;height:56px;border-radius:50%;background:rgba(91,168,216,0.08);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;animation:checkPop 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both;}
-        .sent-success{padding:12px 16px;border-radius:12px;background:rgba(220,245,230,0.90);border:1px solid rgba(30,140,70,0.15);color:#1A5C32;font-size:14px;margin-top:20px;margin-bottom:16px;}
-
-        .trust-panel{display:flex;flex-direction:column;justify-content:center;padding:60px 56px;background:#FFFFFF;border-left:1px solid rgba(0,0,0,0.06);min-height:100vh;}
-        .trust-panel>*{animation:fadeUp 0.5s cubic-bezier(0.16,1,0.3,1) both;}
-        .trust-heading{font-family:'Lora',Georgia,serif;font-size:22px;font-weight:500;color:#1C1A18;letter-spacing:-0.3px;margin-bottom:6px;line-height:1.3;animation-delay:0.1s;}
-        .trust-sub{font-size:14.5px;color:#8A8785;line-height:1.6;margin-bottom:36px;max-width:340px;animation-delay:0.15s;}
-
-        .trust-item{display:flex;gap:16px;align-items:flex-start;padding:20px 0;border-bottom:1px solid rgba(0,0,0,0.05);}
-        .trust-item:last-of-type{border-bottom:none;}
-        .trust-icon{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#FAFAF8,#F5F4F0);border:1px solid rgba(0,0,0,0.06);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;transition:all 200ms ease;}
-        .trust-item:hover .trust-icon{background:linear-gradient(135deg,rgba(91,168,216,0.08),rgba(91,168,216,0.03));border-color:rgba(91,168,216,0.12);transform:scale(1.04);}
-        .trust-label{font-size:14.5px;font-weight:600;color:#1C1A18;margin-bottom:3px;letter-spacing:-0.1px;}
-        .trust-desc{font-size:13px;color:#8A8785;line-height:1.55;}
-
-        .memory-box{margin-top:32px;padding:20px;border-radius:16px;background:linear-gradient(135deg,rgba(248,252,255,0.90),rgba(245,250,255,0.60));border:1px solid rgba(91,168,216,0.10);}
-        .memory-box-label{font-size:10.5px;font-weight:600;letter-spacing:0.1em;color:#5080A0;text-transform:uppercase;margin-bottom:8px;}
-        .memory-box-text{font-size:13.5px;color:#2A6090;line-height:1.65;}
-
-        @keyframes cardEnter{from{opacity:0;transform:translateY(20px) scale(0.97);}to{opacity:1;transform:translateY(0) scale(1);}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
-        @keyframes glowPulse{0%,100%{opacity:0.7;transform:translateX(-50%) scale(1);}50%{opacity:1;transform:translateX(-50%) scale(1.05);}}
-        @keyframes checkPop{from{opacity:0;transform:scale(0.5);}to{opacity:1;transform:scale(1);}}
-      `}</style>
-
-      <div className="root">
-        <div className="form-panel">
-          <div className="card">
-            <div className="logo-row">
-              <img src="/memori-icon.png" alt="Seven" className="logo"/>
-              <span className="brand">Seven</span>
+          {mode === "sent" ? (
+            <div style={{ textAlign: "center", padding: "32px 0" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>📧</div>
+              <p style={{ fontSize: 16, fontWeight: 500, color: "var(--text-primary)", marginBottom: 8 }}>Check your email</p>
+              <p style={{ fontSize: 14, color: "var(--text-muted)" }}>We sent a sign-in link to <strong>{email}</strong></p>
             </div>
+          ) : (
+            <>
+              {/* Google sign in */}
+              <button
+                onClick={handleGoogle}
+                disabled={mode === "sending"}
+                style={{
+                  width: "100%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  gap: 10,
+                  border: "1px solid rgba(0,0,0,0.15)",
+                  borderRadius: "var(--radius-pill)",
+                  padding: "12px 20px",
+                  fontSize: 14, fontWeight: 500,
+                  color: "var(--text-primary)",
+                  background: "var(--surface)",
+                  cursor: mode === "sending" ? "not-allowed" : "pointer",
+                  marginBottom: 20,
+                  transition: "background var(--transition)",
+                  opacity: mode === "sending" ? 0.6 : 1,
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "#f8f8f8")}
+                onMouseLeave={e => (e.currentTarget.style.background = "var(--surface)")}
+              >
+                <GoogleIcon />
+                Continue with Google
+              </button>
 
-            {mode === "sent" ? (
-              <div className="sent-box">
-                <div className="sent-icon-wrap"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5BA8D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/></svg></div>
-                <h1 className="heading" style={{animation:"none"}}>Check your inbox</h1>
-                <p className="sub" style={{animation:"none"}}>We sent a secure link to <strong>{email}</strong>.<br/>Click it to sign in.</p>
-                <div className="sent-success">Email sent successfully</div>
-                <button className="magic-btn" onClick={()=>setMode("signin")}>Use a different email</button>
-                <a href="/" className="back-home" style={{animation:"none"}}>← Back to Seven</a>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+                <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.1)" }} />
+                <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>or use email</span>
+                <div style={{ flex: 1, height: 1, background: "rgba(0,0,0,0.1)" }} />
               </div>
-            ) : (
-              <>
-                <h1 className="heading">{mode === "signup" ? "Create your account" : "Welcome back"}</h1>
-                <p className="sub">{mode === "signup" ? "Start building your cognitive memory." : "Sign in to continue with Seven."}</p>
 
-                {errorMsg && <div className="error-box">{errorMsg}</div>}
-
-                <button className="google-btn" onClick={()=>void handleGoogle()} disabled={status==="busy"}>
-                  <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-                  {status==="busy" ? "Connecting..." : "Continue with Google"}
+              {/* Magic link form */}
+              <form onSubmit={handleMagicLink} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  style={{
+                    width: "100%",
+                    border: "1px solid rgba(0,0,0,0.15)",
+                    borderRadius: "var(--radius-pill)",
+                    padding: "12px 18px",
+                    fontSize: 14, color: "var(--text-primary)",
+                    outline: "none",
+                    background: "var(--surface)",
+                    transition: "border-color var(--transition)",
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "var(--blue)")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "rgba(0,0,0,0.15)")}
+                />
+                {(mode === "error" && errorMsg) && (
+                  <p style={{ fontSize: 13, color: "var(--red)", margin: 0 }}>{errorMsg}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={mode === "sending"}
+                  style={{
+                    background: "var(--blue)",
+                    color: "#fff",
+                    borderRadius: "var(--radius-pill)",
+                    padding: "12px 20px",
+                    fontSize: 14, fontWeight: 500,
+                    cursor: mode === "sending" ? "not-allowed" : "pointer",
+                    opacity: mode === "sending" ? 0.7 : 1,
+                    transition: "opacity var(--transition)",
+                  }}
+                >
+                  {mode === "sending" ? "Sending…" : "Send sign-in link"}
                 </button>
-
-                <div className="divider"><span>or with email</span></div>
-
-                <div className="form-fields">
-                  <div><label className="field-label">Email address</label><div className="field-wrap"><input type="email" className="field-input" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={handleKey} placeholder="you@example.com" autoComplete="email" autoFocus/></div></div>
-                  <div><label className="field-label">{mode==="signup"?"Create a password":"Password"}</label><div className="field-wrap"><input type={showPass?"text":"password"} className="field-input" style={{paddingRight:60}} value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={handleKey} placeholder={mode==="signup"?"At least 8 characters":"Your password"} autoComplete={mode==="signup"?"new-password":"current-password"}/><button className="pass-toggle" onClick={()=>setShowPass(v=>!v)} type="button">{showPass?"Hide":"Show"}</button></div></div>
-                  <button className="primary-btn" onClick={()=>void handleEmailAuth()} disabled={status==="busy"}>{status==="busy"?"Please wait...":mode==="signup"?"Create account":"Sign in"}</button>
-                  <button className="magic-btn" onClick={()=>void handleMagicLink()} disabled={status==="busy"}>{status==="busy"?"Sending...":"Send magic link instead"}</button>
-                </div>
-
-                <div className="mode-switch">
-                  {mode==="signin"?(<>No account yet? <button className="mode-link" onClick={()=>{setMode("signup");setErrorMsg("");}}>Sign up</button></>):(<>Already have an account? <button className="mode-link" onClick={()=>{setMode("signin");setErrorMsg("");}}>Sign in</button></>)}
-                </div>
-                <a href="/" className="back-home">← Back to Seven</a>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="trust-panel">
-          <div className="trust-heading">Your memory. Your rules.</div>
-          <div className="trust-sub">Seven is built on the principle that you own everything stored about you.</div>
-          {[
-            {icon:"🔒",label:"End-to-end encrypted",desc:"Your memories are encrypted at rest and in transit"},
-            {icon:"👁",label:"You control your data",desc:"Export or delete everything at any time"},
-            {icon:"🚫",label:"Never sold or shared",desc:"Your data is never used to train external models"},
-            {icon:"🛡",label:"SOC 2 aligned practices",desc:"Built on enterprise-grade Supabase infrastructure"},
-          ].map(t=>(
-            <div key={t.label} className="trust-item">
-              <div className="trust-icon">{t.icon}</div>
-              <div><div className="trust-label">{t.label}</div><div className="trust-desc">{t.desc}</div></div>
-            </div>
-          ))}
-          <div className="memory-box">
-            <div className="memory-box-label">What Seven remembers</div>
-            <div className="memory-box-text">Decisions you make. Facts about your life. Patterns in your thinking. Everything compounds over time, and you can correct, dispute, or delete any of it at any moment.</div>
-          </div>
+              </form>
+            </>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
